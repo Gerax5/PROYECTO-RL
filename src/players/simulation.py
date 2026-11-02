@@ -104,6 +104,8 @@ def simulate_table(
                 p.on_shuffle(shoe.decks_remaining)
 
         bets = {seat: p.place_bet() for seat, p in enumerate(players)}
+        if not any(bets.values()):
+            continue
         result = play_round(shoe, rules, bets, decide, insure, on_card)
 
         for seat_result in result.seats:

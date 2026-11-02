@@ -3,7 +3,7 @@ name = "blackjack-supervisor"
 version = "0.1.0"
 description = "Supervisor de mesa de blackjack entrenado con aprendizaje por refuerzo"
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26"]
+dependencies = ["numpy>=1.26", "gymnasium>=0.29"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
