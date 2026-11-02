@@ -18,8 +18,9 @@ from .table import Table, TableConfig
 ACTION_NONE, ACTION_WATCH, ACTION_EXPEL = 0, 1, 2
 COUNTER_TYPES = ("counter", "stealth")
 
-# Ventaja aproximada de un jugador con Hi-Lo: -0.5% sin conteo, +0.5% por cada TC.
-BASE_EDGE = -0.005
+# Ventaja aproximada de un jugador con Hi-Lo: -0.4% sin conteo, +0.5% por cada TC.
+# No descuenta los errores deliberados, así que sobreestima al disimulado.
+BASE_EDGE = -0.004
 EDGE_PER_TC = 0.005
 
 

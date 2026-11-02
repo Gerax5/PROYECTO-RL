@@ -181,6 +181,8 @@ stealth_counter:
 
 > `disguise_level` permite hacer **curriculum** (sección 7.2): 0 = idéntico al contador abierto, 1 = casi indistinguible.
 
+> **Medido (4M de rondas, IC95):** con estos parámetros el disimulado gana con nivel 0.3 (+0.37 u/100, [+0.11, +0.63]) y **pierde** desde 0.6 (−0.27 u/100, [−0.50, −0.04]; nivel 1.0: −0.97 u/100). Por eso `TableConfig` usa 0.3 por defecto. Los niveles altos del curriculum (0.6 y 0.9) necesitan otro camuflaje, o el supervisor recibirá premio por expulsar a jugadores que le dan ganancia a la casa.
+
 ---
 
 ## 6. El supervisor (agente RL)
@@ -361,11 +363,12 @@ Graficar todo por **ciclo de reentrenamiento** para mostrar que el supervisor me
 - [ ] `[A+B]` Contrato de interfaces (`EventLog`, espacios de observación/acción) — sección 11.2.
 - [x] `[A]` Shoe, reglas y mano (`src/blackjack/`) + tests de pago y reglas.
 - [x] `[A]` Tabla de estrategia básica + desviaciones I18.
-- [ ] `[A]` Jugadores: casual, contador, disimulado (con `disguise_level`).
-- [ ] `[A]` Verificar por simulación que el contador tiene EV positivo y el casual negativo.
-- [ ] `[A]` Mesa de 5 sillas con entrada/salida de jugadores.
+- [x] `[A]` Jugadores: casual, contador, disimulado (con `disguise_level`).
+- [x] `[A]` Verificar por simulación que el contador tiene EV positivo y el casual negativo (`scripts/validate_players.py`).
+- [ ] `[A]` Conseguir EV > 0 en el disimulado con `disguise_level` ≥ 0.6 (hoy pierde dinero; ver sección 5.3).
+- [x] `[A]` Mesa de 5 sillas con entrada/salida de jugadores.
 - [ ] `[B]` Extractor de features por silla.
-- [ ] `[A]` `CasinoTableEnv` (Gymnasium) + `check_env`.
+- [x] `[A]` `CasinoTableEnv` (Gymnasium) + `check_env`.
 - [ ] `[B]` Baselines (heurística y clasificador).
 - [ ] `[B]` Supervisor RecurrentPPO + logging en TensorBoard.
 - [ ] `[A]` Curriculum de disfraz.

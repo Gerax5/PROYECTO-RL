@@ -54,7 +54,8 @@ class TableConfig:
     bankroll_units: tuple[float, float] = (50.0, 400.0)
     casual: CasualConfig = field(default_factory=CasualConfig)
     counter: CounterConfig = field(default_factory=CounterConfig)
-    stealth: StealthConfig = field(default_factory=StealthConfig)
+    # 0.3 es el mayor nivel medido con EV > 0; desde 0.6 el disimulado pierde dinero.
+    stealth: StealthConfig = field(default_factory=lambda: StealthConfig.from_disguise(0.3))
 
 
 @dataclass

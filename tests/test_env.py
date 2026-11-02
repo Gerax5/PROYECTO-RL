@@ -193,8 +193,8 @@ def test_edge_term_charges_counters_but_not_casuals():
 
 
 def test_expected_counter_gain():
-    assert expected_counter_gain(10, 1) == pytest.approx(0.0)
-    assert expected_counter_gain(10, 3) == pytest.approx(0.1)
+    assert expected_counter_gain(10, 0) == pytest.approx(-0.04)
+    assert expected_counter_gain(10, 3) == pytest.approx(0.11)
 
 
 def test_expelled_player_does_not_play_that_round():
