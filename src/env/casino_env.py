@@ -13,6 +13,7 @@ import gymnasium as gym
 import numpy as np
 
 from .events import SeatEvent
+from .features import SeatFeatureExtractor
 from .table import Table, TableConfig
 
 ACTION_NONE, ACTION_WATCH, ACTION_EXPEL = 0, 1, 2
@@ -52,7 +53,7 @@ class FeatureExtractor(Protocol):
 
 
 class MinimalFeatureExtractor:
-    """Provisional hasta tener `src/env/features.py`; no incluye las señales de TC."""
+    """Versión reducida, sin las señales de TC; sirve de ablación frente a `SeatFeatureExtractor`."""
 
     n_seat_features = 8
     n_global_features = 3
@@ -113,7 +114,7 @@ class CasinoTableEnv(gym.Env):
         self.reward_config = reward_config if reward_config is not None else RewardConfig()
         self.rounds_per_episode = rounds_per_episode
         n_seats = self.table_config.seats
-        self.extractor = extractor if extractor is not None else MinimalFeatureExtractor(n_seats)
+        self.extractor = extractor if extractor is not None else SeatFeatureExtractor(n_seats)
         self.action_space = gym.spaces.MultiDiscrete([3] * n_seats)
         self.observation_space = gym.spaces.Dict(
             {
