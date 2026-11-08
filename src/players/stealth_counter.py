@@ -12,10 +12,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from blackjack import Action, Hand, Rules, basic_strategy, take_insurance
+from blackjack import Action, Hand, Rules, counter_strategy, take_insurance
 
 from .base_player import basic_action, round_to_chip
 from .counter import CounterPlayer, ramp_bet
+
+CHEAP_ERROR_TC_RANGE = 2.0
+COVER_TC_RANGE = (-1.0, 2.0)    # [min, max) del TC en que se permiten apuestas de cobertura
 
 
 @dataclass(frozen=True)
@@ -65,8 +68,14 @@ class StealthCounterPlayer(CounterPlayer):
         cfg = self.stealth
         self._tc_history.append(self.tc)
 
-        if cfg.cover_bet_prob > 0 and self.rng.random() < cfg.cover_bet_prob:
-            # Apuesta de cobertura: "racha caliente", igual que un casual.
+        if (
+            COVER_TC_RANGE[0] <= self.tc < COVER_TC_RANGE[1]
+            and cfg.cover_bet_prob > 0
+            and self.rng.random() < cfg.cover_bet_prob
+        ):
+            # Apuesta de cobertura: "racha caliente", igual que un casual. Sólo con TC
+            # neutro, donde la casa apenas tiene ventaja: con TC alto le quitaba las
+            # apuestas grandes y con TC negativo pagaba la ventaja de la casa.
             units = self._last_bet * 2.0 if self._won_last else 1.0
         else:
             # Con historial lleno, _tc_history[0] es el TC de hace `delay` rondas.
@@ -81,11 +90,28 @@ class StealthCounterPlayer(CounterPlayer):
         self._won_last = net > 0
 
     def decide(self, hand: Hand, dealer_up: int, allowed: frozenset[Action]) -> Action:
-        action = super().decide(hand, dealer_up, allowed)
+        action, play = counter_strategy(
+            hand,
+            dealer_up,
+            self.tc,
+            self.rules,
+            can_double=Action.DOUBLE in allowed,
+            can_split=Action.SPLIT in allowed,
+            can_surrender=Action.SURRENDER in allowed,
+        )
         basic = basic_action(hand, dealer_up, self.rules, allowed)
         if action != basic and self.rng.random() >= self.stealth.index_play_prob:
             action = basic
-        return self._maybe_mistake(hand, action, allowed, self.stealth.deliberate_error_prob)
+        # Un error deliberado sólo se comete cerca del índice, donde casi no cuesta:
+        # errores al azar le quitaban casi toda la ganancia al contador.
+        if (
+            play is not None
+            and play.kind == "hard"
+            and abs(self.tc - play.threshold) <= CHEAP_ERROR_TC_RANGE
+            and self.rng.random() < self.stealth.deliberate_error_prob
+        ):
+            return play.below if action == play.at_or_above else play.at_or_above
+        return action
 
     def insure(self, hand: Hand, dealer_up: int) -> bool:
         return take_insurance(self.tc) and bool(self.rng.random() < self.stealth.index_play_prob)

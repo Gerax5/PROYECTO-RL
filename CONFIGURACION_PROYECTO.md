@@ -181,7 +181,11 @@ stealth_counter:
 
 > `disguise_level` permite hacer **curriculum** (sección 7.2): 0 = idéntico al contador abierto, 1 = casi indistinguible.
 
-> **Medido (4M de rondas, IC95):** con estos parámetros el disimulado gana con nivel 0.3 (+0.37 u/100, [+0.11, +0.63]) y **pierde** desde 0.6 (−0.27 u/100, [−0.50, −0.04]; nivel 1.0: −0.97 u/100). Por eso `TableConfig` usa 0.3 por defecto. Los niveles altos del curriculum (0.6 y 0.9) necesitan otro camuflaje, o el supervisor recibirá premio por expulsar a jugadores que le dan ganancia a la casa.
+> **Camuflaje barato.** Los errores deliberados sólo se cometen en jugadas índice duras con el TC a ≤ 2 del índice, y las apuestas de cobertura sólo con TC en [−1, 2), donde la casa casi no tiene ventaja. Antes el disimulado perdía desde el nivel 0.6 (−0.27 u/100).
+>
+> **Medido (2M de rondas, IC95, `scripts/validate_players.py`):** nivel 0.3: +0.86 u/100 [+0.49, +1.23]; 0.6: +0.37 [+0.04, +0.69]; 0.9: +0.48 [+0.21, +0.76]; 1.0: +0.09 [−0.17, +0.35] (no se distingue de 0). Todos los niveles del curriculum ganan dinero.
+>
+> **Dificultad contra la heurística** (`corr_bet_tc > 0.6`, 20 episodios): expulsa al 50% de los disimulados con nivel 0.0, al 52% con 0.3 y al 35% con 0.6, 0.9 y 1.0.
 
 ---
 
@@ -334,6 +338,8 @@ adversary:
   league_size: 10
 ```
 
+> **Primera prueba** (`scripts/run_adversary.py --cycles 2 --population 8 --generations 3 --ev-rounds 50000`, contra la heurística, medido con semillas que la búsqueda no usó): el disimulado pasó de 52% de expulsión a 16% (aptitud de −1.87 a −0.30). Aprendió a retrasar la rampa 2 rondas, a saltarse la mitad de las jugadas índice y a meter errores baratos cerca del índice. Su EV quedó en +0.50 u/100 [−0.07, +1.07]: con búsquedas tan cortas el EV todavía no se distingue de 0, y hay que correr la configuración completa.
+
 > Nota de realismo: en un casino real no hay etiquetas inmediatas. Para simularlo, opción de **etiquetas retardadas/ruidosas** (p.ej. sólo se confirma el tipo con prob. 0.5 y con retraso de varios turnos).
 
 ---
@@ -365,15 +371,15 @@ Graficar todo por **ciclo de reentrenamiento** para mostrar que el supervisor me
 - [x] `[A]` Tabla de estrategia básica + desviaciones I18.
 - [x] `[A]` Jugadores: casual, contador, disimulado (con `disguise_level`).
 - [x] `[A]` Verificar por simulación que el contador tiene EV positivo y el casual negativo (`scripts/validate_players.py`).
-- [ ] `[A]` Conseguir EV > 0 en el disimulado con `disguise_level` ≥ 0.6 (hoy pierde dinero; ver sección 5.3).
+- [x] `[A]` Conseguir EV > 0 en el disimulado con `disguise_level` 0.6 y 0.9 (sección 5.3).
 - [x] `[A]` Mesa de 5 sillas con entrada/salida de jugadores.
 - [ ] `[B]` Extractor de features por silla.
 - [x] `[A]` `CasinoTableEnv` (Gymnasium) + `check_env`.
 - [ ] `[B]` Baselines (heurística y clasificador).
 - [ ] `[B]` Supervisor RecurrentPPO + logging en TensorBoard.
-- [ ] `[A]` Curriculum de disfraz.
+- [x] `[A]` Curriculum de disfraz (`src/env/curriculum.py`).
 - [ ] `[B]` Bucle de reentrenamiento continuo + buffer.
-- [ ] `[A]` Adversario evolutivo + liga.
+- [x] `[A]` Adversario evolutivo + liga (`src/retraining/adversary.py`, `scripts/run_adversary.py`; mientras no haya supervisor entrenado evoluciona contra la heurística).
 - [ ] `[B]` Métricas y script de evaluación.
 - [ ] `[A+B]` Experimentos finales, gráficas e informe.
 

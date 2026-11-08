@@ -56,6 +56,8 @@ class TableConfig:
     counter: CounterConfig = field(default_factory=CounterConfig)
     # 0.3 es el mayor nivel medido con EV > 0; desde 0.6 el disimulado pierde dinero.
     stealth: StealthConfig = field(default_factory=lambda: StealthConfig.from_disguise(0.3))
+    # Si no está vacío, cada disimulado que llega sortea su camuflaje aquí (liga de adversarios).
+    stealth_pool: tuple[StealthConfig, ...] = ()
 
 
 @dataclass
@@ -99,7 +101,9 @@ class Table:
         if kind == "counter":
             return CounterPlayer(cfg.counter, rules, self.rng)
         if kind == "stealth":
-            return StealthCounterPlayer(cfg.stealth, rules, self.rng)
+            pool = cfg.stealth_pool
+            stealth = pool[self.rng.integers(len(pool))] if pool else cfg.stealth
+            return StealthCounterPlayer(stealth, rules, self.rng)
         raise ValueError(f"tipo de jugador desconocido: {kind}")
 
     def _event(self, seat: int, sp: SeatedPlayer, event: str, **kw) -> SeatEvent:
