@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mesa del supervisor</title>
+<style>
+  :root {
+    --bg: #12161b;
+    --panel: #1b2128;
+    --panel-2: #232b34;
+    --line: #2f3944;
+    --text: #e8ecef;
+    --muted: #93a1ad;
+    --felt: #0f5c3a;
+    --felt-edge: #0a3f28;
+    --rail: #5a3a1f;
+    --gold: #e0b44c;
+    --casual: #6aa9e9;
+    --counter: #ef5b5b;
+    --stealth: #c58cf2;
+    --ok: #3fbf7f;
+    --bad: #ef5b5b;
+    --warn: #e9a23b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header { padding: 14px 20px 6px; display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; }
+  header h1 { font-size: 18px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; padding: 10px 20px 20px; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; padding: 10px 16px 16px; } }
+
+  /* ------------------------------------------------------------ mesa */
+  .table-wrap { position: relative; }
+  .felt {
+    position: relative; width: 100%; aspect-ratio: 16 / 9; min-height: 420px;
+    background: radial-gradient(ellipse at 50% 20%, #157a4d 0%, var(--felt) 55%, var(--felt-edge) 100%);
+    border: 14px solid var(--rail); border-top-width: 10px;
+    border-radius: 24px 24px 50% 50% / 24px 24px 40% 40%;
+    box-shadow: inset 0 0 60px rgba(0,0,0,.45), 0 10px 30px rgba(0,0,0,.4);
+    overflow: hidden;
+  }
+  .felt .arc-text {
+    position: absolute; left: 50%; top: 38%; transform: translateX(-50%);
+    color: rgba(255,255,255,.18); font-weight: 700; letter-spacing: .12em; font-size: 12px;
+    text-align: center; white-space: nowrap; pointer-events: none;
+  }
+  .dealer { position: absolute; left: 50%; top: 6%; transform: translateX(-50%); text-align: center; }
+  .label { font-size: 11px; color: rgba(255,255,255,.7); text-transform: uppercase; letter-spacing: .08em; }
+  .hud { position: absolute; top: 5%; display: flex; flex-direction: column; gap: 6px; }
+  .hud.left { left: 3%; } .hud.right { right: 3%; align-items: flex-end; }
+  .pill {
+    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12); border-radius: 999px;
+    padding: 4px 10px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .pill b { font-weight: 700; }
+  .tc-hot { color: #ffd166; } .tc-cold { color: #9ecbff; }
+  .shoe-bar { width: 120px; height: 6px; background: rgba(255,255,255,.15); border-radius: 3px; overflow: hidden; }
+  .shoe-bar > div { height: 100%; background: var(--gold); }
+
+  .cards { display: flex; justify-content: center; gap: 3px; min-height: 52px; margin: 4px 0; }
+  .card {
+    width: 34px; height: 48px; border-radius: 5px; background: #fdfdfb; color: #1b1b1b;
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px;
+    box-shadow: 0 2px 4px rgba(0,0,0,.35); border: 1px solid #d8d8d0;
+  }
+  .card.red { color: #c0262d; }
+  .card.small { width: 26px; height: 37px; font-size: 13px; }
+  .total { font-size: 12px; font-variant-numeric: tabular-nums; }
+  .total.bust { color: #ffb3b3; } .total.bj { color: var(--gold); font-weight: 700; }
+
+  .seats { position: absolute; inset: 0; pointer-events: none; }
+  .seat {
+    position: absolute; width: 17%; transform: translate(-50%, -50%); pointer-events: auto;
+    display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer;
+  }
+  .seat .box {
+    width: 100%; min-height: 96px; border-radius: 12px; padding: 6px 6px 7px;
+    background: rgba(0,0,0,.28); border: 2px solid rgba(255,255,255,.14);
+    display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative;
+    transition: border-color .15s, background .15s;
+  }
+  .seat.selected .box { border-color: var(--gold); }
+  .seat.empty .box { border-style: dashed; background: rgba(0,0,0,.12); justify-content: center; color: rgba(255,255,255,.4); }
+  .seat .who { font-size: 12px; display: flex; gap: 5px; align-items: center; flex-wrap: wrap; justify-content: center; }
+  .badge { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 999px; color: #111; text-transform: uppercase; letter-spacing: .04em; }
+  .badge.casual { background: var(--casual); } .badge.counter { background: var(--counter); } .badge.stealth { background: var(--stealth); }
+  .seat.type-casual .box { box-shadow: inset 0 -3px 0 var(--casual); }
+  .seat.type-counter .box { box-shadow: inset 0 -3px 0 var(--counter); }
+  .seat.type-stealth .box { box-shadow: inset 0 -3px 0 var(--stealth); }
+  .hide-types .badge, .hide-types .seat .box { box-shadow: none !important; }
+  .hide-types .badge { display: none; }
+  .hands { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+  .hand { display: flex; flex-direction: column; align-items: center; }
+  .chip {
+    min-width: 34px; height: 34px; padding: 0 5px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 12px; color: #fff; border: 3px dashed rgba(255,255,255,.75);
+    box-shadow: 0 2px 5px rgba(0,0,0,.4); font-variant-numeric: tabular-nums;
+  }
+  .net { font-size: 12px; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .net.pos { color: #8ff0b5; } .net.neg { color: #ffb3b3; }
+  .meter { width: 100%; }
+  .meter .bar { position: relative; height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: visible; }
+  .meter .fill { position: absolute; top: 0; height: 100%; border-radius: 3px; }
+  .meter .thr { position: absolute; top: -3px; width: 2px; height: 12px; background: #fff; opacity: .8; }
+  .meter .cap { display: flex; justify-content: space-between; font-size: 10px; color: rgba(255,255,255,.7); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .tag { position: absolute; top: -10px; right: -6px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 6px; background: #fff; color: #111; }
+  .tag.eye { background: var(--warn); }
+  .stamp {
+    position: absolute; inset: -4px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 800; letter-spacing: .06em; text-align: center; font-size: 13px; z-index: 2; padding: 6px;
+    background: rgba(10,10,10,.82); border: 2px solid; animation: pop .35s ease-out;
+  }
+  .stamp.ok { border-color: var(--ok); color: #9ff3c4; }
+  .stamp.bad { border-color: var(--bad); color: #ffb3b3; }
+  .stamp small { font-weight: 500; letter-spacing: 0; font-size: 11px; color: #ddd; margin-top: 2px; }
+  @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* ------------------------------------------------------------ controles */
+  .controls { margin-top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button, select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 6px 10px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--gold); color: #1a1408; border-color: var(--gold); font-weight: 700; min-width: 86px; }
+  label.chk { display: flex; gap: 6px; align-items: center; color: var(--muted); cursor: pointer; user-select: none; }
+  .scrub { position: relative; margin-top: 10px; }
+  .scrub input { width: 100%; accent-color: var(--gold); }
+  .ticks { position: relative; height: 10px; margin: 0 8px; }
+  .ticks i { position: absolute; top: 0; width: 2px; height: 10px; border-radius: 1px; }
+  .ticks i.ok { background: var(--ok); } .ticks i.bad { background: var(--bad); }
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; background: var(--c); }
+
+  /* ------------------------------------------------------------ panel */
+  aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .card-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .card-panel h2 { font-size: 13px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: var(--panel-2); border-radius: 8px; padding: 7px 9px; }
+  .stat .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .k { font-size: 11px; color: var(--muted); }
+  .v.ok { color: var(--ok); } .v.bad { color: var(--bad); }
+  .feat { display: grid; grid-template-columns: 1fr 64px; gap: 3px 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .feat .n { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .feat .n.key { color: var(--gold); }
+  .feat .x { text-align: right; }
+  .log { max-height: 260px; overflow-y: auto; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .log div { padding: 4px 6px; border-radius: 6px; background: var(--panel-2); }
+  .log .r { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 4px; }
+  .log .ok { color: var(--ok); font-weight: 700; } .log .bad { color: var(--bad); font-weight: 700; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mesa del supervisor</h1>
+  <div class="meta" id="meta"></div>
+</header>
+<main>
+  <section>
+    <div class="table-wrap" id="tableWrap">
+      <div class="felt" id="felt">
+        <div class="hud left">
+          <div class="pill">Ronda <b id="roundNo">0</b></div>
+          <div class="pill">TC <b id="tc">0</b></div>
+        </div>
+        <div class="hud right">
+          <div class="pill">Zapato <b id="pen">0%</b></div>
+          <div class="shoe-bar"><div id="penBar"></div></div>
+        </div>
+        <div class="dealer">
+          <div class="label">Dealer</div>
+          <div class="cards" id="dealerCards"></div>
+          <div class="total" id="dealerTotal"></div>
+        </div>
+        <div class="arc-text">BLACKJACK PAGA 3 A 2 · EL DEALER SE PLANTA EN 17</div>
+        <div class="seats" id="seats"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="row">
+        <button id="first" title="Inicio (Inicio)">⏮</button>
+        <button id="prev" title="Ronda anterior (←)">◀</button>
+        <button id="play" class="primary" title="Reproducir / pausa (espacio)">▶ Play</button>
+        <button id="next" title="Ronda siguiente (→)">▶</button>
+        <button id="nextExpel" title="Ir a la próxima expulsión (E)">Próxima expulsión ⏭</button>
+        <select id="speed" title="Velocidad">
+          <option value="1">1 ronda/s</option>
+          <option value="3" selected>3 rondas/s</option>
+          <option value="8">8 rondas/s</option>
+          <option value="20">20 rondas/s</option>
+          <option value="60">60 rondas/s</option>
+        </select>
+        <label class="chk"><input type="checkbox" id="reveal" checked> Mostrar tipo real <span class="muted">(el supervisor no lo ve)</span></label>
+      </div>
+      <div class="scrub">
+        <input type="range" id="scrub" min="0" value="0">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <div class="legend">
+        <span style="--c: var(--casual)">Casual</span>
+        <span style="--c: var(--counter)">Contador</span>
+        <span style="--c: var(--stealth)">Disimulado</span>
+        <span style="--c: var(--ok)">Expulsión correcta</span>
+        <span style="--c: var(--bad)">Falso positivo</span>
+        <span class="muted" style="--c: transparent">Barra: sospecha (corr. apuesta–TC); línea blanca: umbral</span>
+      </div>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card-panel">
+      <h2>Marcador</h2>
+      <div class="stats">
+        <div class="stat"><div class="v" id="sHouse">0</div><div class="k">Ganancia de la casa (u)</div></div>
+        <div class="stat"><div class="v" id="sReward">0</div><div class="k">Recompensa acumulada</div></div>
+        <div class="stat"><div class="v ok" id="sHits">0</div><div class="k">Contadores expulsados</div></div>
+        <div class="stat"><div class="v bad" id="sFP">0</div><div class="k">Casuales expulsados</div></div>
+      </div>
+      <div class="muted" id="sSeen" style="margin-top:8px;font-size:12px"></div>
+    </div>
+    <div class="card-panel">
+      <h2 id="detailTitle">Silla</h2>
+      <div id="detail" class="feat"></div>
+    </div>
+    <div class="card-panel">
+      <h2>Bitácora</h2>
+      <div class="log" id="log"></div>
+    </div>
+  </aside>
+</main>
+
+<script id="replay-data" type="application/json">__REPLAY_DATA__</script>
+<script>
+(() => {
+  const R = JSON.parse(document.getElementById("replay-data").textContent);
+  const F = R.frames, META = R.meta, N = META.seats;
+  const THR = META.threshold ?? null;
+  const TYPE_ES = { casual: "casual", counter: "contador", stealth: "disimulado" };
+  const $ = id => document.getElementById(id);
+  const fmt = (x, d = 1) => (x > 0 ? "+" : "") + Number(x).toFixed(d);
+  const rondas = n => `${n} ${n === 1 ? "ronda" : "rondas"}`;
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  let i = 0, playing = false, timer = null, selected = null;
+
+  // ---------------------------------------------------- encabezado y escala
+  const metaBits = [`semilla ${META.seed}`, `${F.length} rondas`];
+  if (META.policy) metaBits.unshift(META.policy);
+  if (META.disguise != null) metaBits.push(`disfraz ${META.disguise}`);
+  $("meta").textContent = metaBits.join(" · ");
+  $("scrub").max = F.length - 1;
+
+  // marcas de expulsión en la línea de tiempo
+  F.forEach((f, k) => f.log.forEach(e => {
+    if (e.kind !== "expelled") return;
+    const t = document.createElement("i");
+    t.className = e.correct ? "ok" : "bad";
+    t.style.left = `${(k / Math.max(F.length - 1, 1)) * 100}%`;
+    t.title = `Ronda ${f.round}: ${TYPE_ES[e.type]}`;
+    $("ticks").appendChild(t);
+  }));
+
+  // sillas en arco (silla 1 a la izquierda)
+  const seatEls = [];
+  for (let s = 0; s < N; s++) {
+    const t = N === 1 ? 0.5 : s / (N - 1);
+    const x = 12 + t * 76;
+    const y = 58 + Math.sin(Math.PI * t) * 20;
+    const el = document.createElement("div");
+    el.className = "seat";
+    el.style.left = `${x}%`; el.style.top = `${y}%`;
+    el.addEventListener("click", () => { selected = s; render(); });
+    $("seats").appendChild(el);
+    seatEls.push(el);
+  }
+
+  // ---------------------------------------------------- piezas
+  // El simulador sólo guarda el valor de la carta (no el palo), así que no se dibujan palos.
+  function cardsHTML(cards, small) {
+    return cards.map(c => `<div class="card${small ? " small" : ""}">${esc(c)}</div>`).join("");
+  }
+  function totalHTML(h) {
+    if (h.blackjack) return `<span class="total bj">Blackjack</span>`;
+    if (h.bust) return `<span class="total bust">${h.total} · se pasa</span>`;
+    return `<span class="total">${h.soft ? "suave " : ""}${h.total}${h.doubled ? " · dobla" : ""}</span>`;
+  }
+  function chipColor(bet) {
+    if (bet >= 12) return "#111";
+    if (bet >= 8) return "#6b2fb3";
+    if (bet >= 4) return "#1d7a3b";
+    if (bet >= 2) return "#c0262d";
+    return "#2f6fb8";
+  }
+  function meterHTML(feat) {
+    if (!feat) return "";
+    const v = feat[META.suspicion_feature] ?? 0;
+    const pct = Math.max(0, Math.min(1, (v + 1) / 2)) * 100; // [-1, 1] -> [0, 100]
+    const hot = THR != null ? v > THR : v > 0.5;
+    const color = hot ? "var(--bad)" : v > 0.2 ? "var(--warn)" : "var(--casual)";
+    const left = Math.min(pct, 50), width = Math.abs(pct - 50);
+    const thr = THR != null ? `<div class="thr" style="left:${((THR + 1) / 2) * 100}%"></div>` : "";
+    return `<div class="meter"><div class="bar"><div class="fill" style="left:${left}%;width:${width}%;background:${color}"></div>${thr}</div>
+      <div class="cap"><span>sospecha ${fmt(v, 2)}</span><span>${rondas(Math.round(feat.rounds_seen))}</span></div></div>`;
+  }
+
+  // ---------------------------------------------------- dibujo de un cuadro
+  function render() {
+    const f = F[i];
+    $("roundNo").textContent = `${f.round} / ${F[F.length - 1].round}`;
+    const tc = $("tc");
+    tc.textContent = fmt(f.tc, 1);
+    tc.className = f.tc >= 2 ? "tc-hot" : f.tc <= -2 ? "tc-cold" : "";
+    $("pen").textContent = `${Math.round(f.penetration * 100)}%`;
+    $("penBar").style.width = `${f.penetration * 100}%`;
+
+    if (f.dealer) {
+      $("dealerCards").innerHTML = cardsHTML(f.dealer.cards);
+      $("dealerTotal").innerHTML = totalHTML(f.dealer);
+    } else {
+      $("dealerCards").innerHTML = "";
+      $("dealerTotal").innerHTML = `<span class="total muted">nadie apostó</span>`;
+    }
+
+    const expelledHere = {};
+    f.log.forEach(e => { if (e.kind === "expelled") expelledHere[e.seat] = e; });
+
+    f.seats.forEach((s, k) => {
+      const el = seatEls[k];
+      el.className = "seat" + (selected === k ? " selected" : "") + (s.occupied ? ` type-${s.type}` : " empty");
+      let body;
+      if (!s.occupied) {
+        body = `<div>Silla ${k + 1}</div><div style="font-size:11px">vacía</div>`;
+      } else {
+        const hands = (s.hands || []).map(h =>
+          `<div class="hand"><div class="cards">${cardsHTML(h.cards, true)}</div>${totalHTML(h)}</div>`).join("");
+        const netCls = s.net > 0 ? "pos" : s.net < 0 ? "neg" : "";
+        const tags = [];
+        if (s.sat) tags.push(`<span class="tag">se sienta</span>`);
+        else if (s.left) tags.push(`<span class="tag">se va</span>`);
+        if (s.watched) tags.push(`<span class="tag eye" style="right:auto;left:-6px">vigilado</span>`);
+        body = `${tags.join("")}
+          <div class="who">Silla ${k + 1} · #${s.player_id} <span class="badge ${s.type}">${TYPE_ES[s.type]}</span></div>
+          <div class="hands">${hands || '<span class="muted" style="font-size:12px">no apuesta</span>'}</div>
+          <div class="row" style="justify-content:center;gap:8px">
+            ${s.bet > 0 ? `<div class="chip" style="background:${chipColor(s.bet)}">${s.bet}</div>` : ""}
+            <div class="net ${netCls}">${s.bet > 0 ? fmt(s.net, 1) : "—"}<div class="muted" style="font-weight:400;font-size:10px">sesión ${fmt(s.session_net, 1)}</div></div>
+          </div>
+          ${meterHTML(s.features)}`;
+      }
+      const ex = expelledHere[k];
+      if (ex) {
+        body += `<div class="stamp ${ex.correct ? "ok" : "bad"}">EXPULSADO
+          <small>era ${TYPE_ES[ex.type]} · ${ex.correct ? "acierto" : "falso positivo"}<br>tras ${rondas(ex.rounds_seen)}</small></div>`;
+      }
+      el.innerHTML = `<div class="box">${body}</div>`;
+    });
+
+    // marcador
+    $("sHouse").textContent = fmt(f.house_net, 1);
+    $("sHouse").className = "v " + (f.house_net >= 0 ? "ok" : "bad");
+    $("sReward").textContent = fmt(f.total_reward, 1);
+    $("sHits").textContent = f.hits;
+    $("sFP").textContent = f.false_positives;
+    const seen = f.seen || {};
+    $("sSeen").textContent = `Han pasado por la mesa: ${seen.casual || 0} casuales, ${seen.counter || 0} contadores, ${seen.stealth || 0} disimulados`;
+
+    renderDetail(f);
+    renderLog();
+    $("scrub").value = i;
+    document.body.classList.toggle("hide-types", !$("reveal").checked);
+  }
+
+  function renderDetail(f) {
+    if (selected == null) {
+      $("detailTitle").textContent = "Silla";
+      $("detail").innerHTML = `<div class="muted" style="grid-column:1/-1">Haz clic en una silla para ver lo que observa el supervisor de ese jugador.</div>`;
+      return;
+    }
+    const s = f.seats[selected];
+    $("detailTitle").textContent = `Silla ${selected + 1} · lo que ve el supervisor`;
+    if (!s.features) {
+      $("detail").innerHTML = `<div class="muted" style="grid-column:1/-1">${s.occupied ? "El jugador se fue en esta ronda." : "Silla vacía."}</div>`;
+      return;
+    }
+    $("detail").innerHTML = R.features.map(n =>
+      `<div class="n${n === META.suspicion_feature ? " key" : ""}" title="${n}">${n}</div><div class="x">${Number(s.features[n]).toFixed(2)}</div>`
+    ).join("") + (s.actions && s.actions.length
+      ? `<div class="n" style="grid-column:1/-1;margin-top:6px">Jugadas de esta ronda: <span style="color:var(--text)">${esc(s.actions.join(", "))}</span>${s.index_play ? ' · <span style="color:var(--gold)">jugada índice</span>' : ""}</div>` : "");
+  }
+
+  function logLine(f, e) {
+    const seat = `Silla ${e.seat + 1}`;
+    const type = `<span class="badge ${e.type}">${TYPE_ES[e.type]}</span>`;
+    if (e.kind === "expelled")
+      return `<span class="r">R${f.round}</span>${seat}: <span class="${e.correct ? "ok" : "bad"}">expulsado</span> ${type} tras ${rondas(e.rounds_seen)}`;
+    if (e.kind === "sit") return `<span class="r">R${f.round}</span>${seat}: se sienta ${type}`;
+    return `<span class="r">R${f.round}</span>${seat}: se va ${type} (${fmt(e.session_net, 1)} u)`;
+  }
+  function renderLog() {
+    const lines = [];
+    for (let k = i; k >= 0 && lines.length < 40; k--)
+      for (let j = F[k].log.length - 1; j >= 0 && lines.length < 40; j--) lines.push(logLine(F[k], F[k].log[j]));
+    $("log").innerHTML = lines.length ? lines.map(l => `<div>${l}</div>`).join("") : `<div class="muted">Sin eventos todavía.</div>`;
+  }
+
+  // ---------------------------------------------------- reproducción
+  function go(k) { i = Math.max(0, Math.min(F.length - 1, k)); render(); }
+  function setPlaying(p) {
+    playing = p;
+    $("play").textContent = p ? "⏸ Pausa" : "▶ Play";
+    clearInterval(timer);
+    if (p) timer = setInterval(() => {
+      if (i >= F.length - 1) return setPlaying(false);
+      go(i + 1);
+    }, 1000 / Number($("speed").value));
+  }
+  function nextExpulsion() {
+    for (let k = i + 1; k < F.length; k++)
+      if (F[k].log.some(e => e.kind === "expelled")) { setPlaying(false); return go(k); }
+  }
+
+  $("play").onclick = () => setPlaying(!playing);
+  $("prev").onclick = () => { setPlaying(false); go(i - 1); };
+  $("next").onclick = () => { setPlaying(false); go(i + 1); };
+  $("first").onclick = () => { setPlaying(false); go(0); };
+  $("nextExpel").onclick = nextExpulsion;
+  $("speed").onchange = () => { if (playing) setPlaying(true); };
+  $("scrub").oninput = e => { setPlaying(false); go(Number(e.target.value)); };
+  $("reveal").onchange = render;
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "INPUT" && e.target.type === "range") return;
+    if (e.key === " ") { e.preventDefault(); setPlaying(!playing); }
+    else if (e.key === "ArrowRight") { setPlaying(false); go(i + 1); }
+    else if (e.key === "ArrowLeft") { setPlaying(false); go(i - 1); }
+    else if (e.key === "Home") { setPlaying(false); go(0); }
+    else if (e.key.toLowerCase() === "e") nextExpulsion();
+  });
+
+  // Abrir en una ronda concreta: mesa.html#r=120 (y #s=3 para seleccionar la silla 3)
+  const hash = new URLSearchParams(location.hash.slice(1));
+  if (hash.has("s")) selected = Math.max(0, Math.min(N - 1, Number(hash.get("s")) - 1));
+  if (hash.has("r")) {
+    const k = F.findIndex(f => f.round >= Number(hash.get("r")));
+    if (k >= 0) i = k;
+  }
+  render();
+})();
+</script>
+</body>
+</html>

@@ -89,6 +89,8 @@ class Table:
         self.running_count = 0
         self._next_player_id = 0
         self._pending: list[SeatEvent] = []
+        # Cartas de la última ronda (RoundResult), o None si nadie apostó; para visualizar.
+        self.last_round = None
 
     @property
     def tc(self) -> float:
@@ -230,11 +232,13 @@ class Table:
         tc, penetration = self.tc, self.shoe.penetration_used
         bets = self._place_bets()
         results = {}
+        self.last_round = None
         if any(b > 0 for b in bets.values()):
             outcome = play_round(
                 self.shoe, self.config.rules, bets, self._decide, self._insure, self._on_card
             )
             results = {r.seat: r for r in outcome.seats}
+            self.last_round = outcome
 
         for seat, sp in enumerate(self.seats):
             if sp is None:

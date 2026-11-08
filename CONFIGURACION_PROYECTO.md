@@ -360,6 +360,16 @@ adversary:
 
 Graficar todo por **ciclo de reentrenamiento** para mostrar que el supervisor mejora con el tiempo.
 
+### 8.1 Mesa visual
+
+`python scripts/render_table.py --seed 7 --rounds 600` graba un episodio y abre una repetición en el navegador (`replays/mesa.html`, autocontenida). Muestra:
+- las cartas del dealer y de cada silla, las apuestas, el TC y cuánto se ha usado el zapato;
+- en cada silla, una barra con la sospecha del supervisor (`corr_bet_tc`) y el umbral;
+- cada expulsión, marcada como acierto o falso positivo;
+- un marcador, una bitácora y las features de la silla seleccionada.
+
+El tipo real de cada jugador se puede ocultar; el supervisor nunca lo ve. Por ahora graba al supervisor heurístico (`--policy heuristic|never`). Cualquier política con `reset()` y `act(obs)` sirve con `eval.replay.record_episode`. Con `mesa.html#r=120&s=3` se abre en la ronda 120 con la silla 3 seleccionada.
+
 ---
 
 ## 9. Checklist de implementación
