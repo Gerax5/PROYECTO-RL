@@ -38,3 +38,8 @@ Desktop.ini
 
 # Repeticiones visuales generadas (scripts/render_table.py)
 replays/
+
+# Clasificadores entrenados (scripts/train_classifier.py)
+models/
+
+.claude/

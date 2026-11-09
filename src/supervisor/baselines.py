@@ -16,7 +16,7 @@ class NeverExpel:
     def reset(self) -> None:
         pass
 
-    def act(self, obs: dict[str, np.ndarray]) -> np.ndarray:
+    def act(self, obs: dict[str, np.ndarray], events=None) -> np.ndarray:
         return np.full(len(obs["seats"]), ACTION_NONE)
 
 
@@ -31,7 +31,7 @@ class HeuristicSupervisor:
     def reset(self) -> None:
         pass
 
-    def act(self, obs: dict[str, np.ndarray]) -> np.ndarray:
+    def act(self, obs: dict[str, np.ndarray], events=None) -> np.ndarray:
         seats = obs["seats"]
         expel = (
             (seats[:, F["occupied"]] > 0)

@@ -41,62 +41,66 @@
 
 | Componente | Herramienta |
 |---|---|
-| Lenguaje | Python 3.11 |
+| Lenguaje | Python 3.12 (≥ 3.11) |
 | Ambiente | `gymnasium` (≥ 0.29) |
-| RL | `stable-baselines3` + `sb3-contrib` (`RecurrentPPO`) o `torch` propio |
-| Redes | `torch` (≥ 2.x) |
-| Configuración | `hydra-core` / archivos YAML |
-| Logging | `tensorboard` (o `wandb`) |
-| Datos / análisis | `numpy`, `pandas`, `matplotlib` |
+| RL | `stable-baselines3` + `sb3-contrib` (`RecurrentPPO`) |
+| Redes | `torch` (≥ 2.9, CPU) |
+| Configuración | dataclasses (`TableConfig`, `RewardConfig`, `TrainConfig`, `OnlineConfig`) + argumentos de los scripts |
+| Logging | `tensorboard` |
+| Baseline supervisado | `scikit-learn` |
+| Adversario | `cma` (CMA-ES) |
 | Tests | `pytest` |
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate          # Windows
-pip install gymnasium stable-baselines3 sb3-contrib torch numpy pandas matplotlib hydra-core tensorboard pytest
+```powershell
+py -3.12 -m venv .venv
+.venv\Scripts\python.exe -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv\Scripts\python.exe -m pip install -e ".[dev,rl]"
+.venv\Scripts\python.exe -m pytest -m "not slow"
 ```
+
+> **Windows con Smart App Control:** bloquea cada DLL nueva (torch, scipy, sklearn) la primera vez que se carga y la permite después de verificarla en la nube; si un import falla con `An Application Control policy has blocked this file`, se reintenta. Con Python 3.14 `torch_python.dll` queda bloqueada siempre: usar 3.12.
 
 ---
 
-## 3. Estructura de carpetas sugerida
+## 3. Estructura de carpetas
+
+Todo está implementado. Los YAML de `configs/` no se crearon: la configuración vive en dataclasses y en los argumentos de los scripts.
 
 ```
 PROYECTO/
-├── configs/
-│   ├── env.yaml              # mesa, shoe, reglas, llegada de jugadores
-│   ├── players.yaml          # parámetros de cada tipo de jugador
-│   ├── supervisor.yaml       # red, algoritmo, hiperparámetros
-│   └── training.yaml         # fases, curriculum, reentrenamiento
+├── scripts/
+│   ├── validate_players.py   # EV de cada tipo de jugador por simulación
+│   ├── evaluate_baselines.py # compara heurística, clasificador y modelos RL (mismas semillas)
+│   ├── train_classifier.py   # baseline supervisado
+│   ├── train_supervisor.py   # entrenamiento (Recurrent)PPO + TensorBoard
+│   ├── sweep_reward.py       # barrido de expel_casual → curva de trade-off
+│   ├── run_adversary.py      # adversario CMA-ES (contra la heurística o un modelo con --supervisor)
+│   ├── online_retrain.py     # reentrenamiento continuo + arms race
+│   └── render_table.py       # mesa visual en HTML (--model para ver un modelo entrenado)
 ├── src/
-│   ├── blackjack/            # ✅ implementado
-│   │   ├── cards.py          # cartas y conteo Hi-Lo
-│   │   ├── shoe.py           # baraja, corte, reshuffle
-│   │   ├── rules.py          # reglas (S17/H17, DAS, splits, BJ 3:2) y acciones
-│   │   ├── hand.py
-│   │   ├── basic_strategy.py # tablas de estrategia básica
-│   │   ├── deviations.py     # Illustrious 18 + seguro
-│   │   └── engine.py         # motor de una ronda multi-silla (callbacks de decisión)
-│   ├── players/
-│   │   ├── base_player.py
-│   │   ├── casual.py
-│   │   ├── counter.py
-│   │   └── stealth_counter.py
+│   ├── blackjack/            # cartas, shoe, reglas, manos, estrategia básica, I18, motor de ronda
+│   ├── players/              # casual, contador, disimulado (disguise_level) + simulación de EV
 │   ├── env/
 │   │   ├── table.py          # 5 sillas, rondas, entrada/salida
-│   │   ├── features.py       # extracción de features por silla
+│   │   ├── features.py       # extracción de features por silla (15 por silla + 4 globales)
+│   │   ├── curriculum.py     # etapas de disguise_level
 │   │   └── casino_env.py     # wrapper Gymnasium
 │   ├── supervisor/
-│   │   ├── policy.py         # red (GRU/Transformer por silla)
-│   │   └── train.py
+│   │   ├── baselines.py      # nunca expulsa + heurística
+│   │   ├── classifier.py     # baseline supervisado (logística / gradient boosting)
+│   │   ├── policy.py         # encoder compartido por silla (SeatSetEncoder)
+│   │   └── train.py          # TrainConfig, train(), carga de modelos
 │   ├── retraining/
-│   │   ├── buffer.py
-│   │   ├── online_loop.py
-│   │   └── adversary.py      # evolución de contadores disimulados
+│   │   ├── buffer.py         # mezcla 70/30 de escenarios nuevos/históricos
+│   │   ├── online_loop.py    # ciclos adversario → fine-tuning → validación → promoción
+│   │   └── adversary.py      # evolución de contadores disimulados + liga
 │   └── eval/
 │       ├── metrics.py
-│       └── evaluate.py
+│       ├── evaluate.py
+│       └── replay.py         # grabación de episodios para la mesa visual
 ├── tests/
-├── notebooks/
+├── runs/                     # corridas de entrenamiento (ignorado por git)
+├── models/                   # clasificadores entrenados (ignorado por git)
 └── CONFIGURACION_PROYECTO.md
 ```
 
@@ -204,17 +208,21 @@ Para cada una de las 5 sillas, un vector de features calculado sobre el historia
 | `occupied` | silla ocupada (0/1) |
 | `rounds_seen` | cuántas rondas lleva (confianza de la estimación) |
 | `bet_norm` | apuesta actual / apuesta mínima del jugador |
-| `corr_bet_tc` | correlación de Pearson/Spearman entre apuesta y TC **calculado por el supervisor** ← señal clave |
-| `bet_spread` | max/min de la apuesta en la ventana |
+| `corr_bet_tc` | correlación de Pearson entre apuesta y TC **calculado por el supervisor** ← señal clave |
+| `rank_corr_bet_tc` | correlación de Spearman (robusta al ruido de apuesta) |
 | `bet_tc_slope` | pendiente de regresión apuesta ~ TC |
+| `bet_spread` | max/min de la apuesta en la ventana |
 | `corr_bet_prev_result` | correlación con resultado previo (típico de casual) |
 | `index_play_rate` | % de desviaciones que coinciden con I18 cuando el TC lo justifica |
-| `basic_strategy_error_rate` | % de errores vs. estrategia básica |
-| `insurance_tc_mean` | TC promedio cuando toma seguro |
-| `entry_tc` / `exit_tc` | TC al entrar/salir (detecta wonging) |
+| `basic_strategy_error_rate` | % de rondas con desviaciones que no son índice |
+| `insurance_rate` / `insurance_tc_mean` | frecuencia de seguro y TC promedio cuando lo toma |
+| `sit_out_rate` | % de rondas sentado sin apostar (wonging) |
+| `entry_tc` | TC al sentarse (wonging). `exit_tc` no se usa: la silla queda vacía al irse |
 | `net_win_units` | ganancia acumulada del jugador |
 
-**Features globales**: TC actual, penetración del shoe, número de jugadores, número de expulsiones en el turno.
+Las correlaciones y pendientes valen 0 con menos de 5 rondas con apuesta. **Features globales**: TC actual, penetración del shoe, número de jugadores, número de expulsiones en el episodio.
+
+> **Medido** (300 rondas por silla, disimulado nivel 0.3): `corr_bet_tc` promedio casual +0.03, disimulado +0.58, contador +0.71; `basic_strategy_error_rate` casual 0.108, disimulado 0.009, contador 0.000.
 
 ```python
 observation_space = gym.spaces.Dict({
@@ -282,6 +290,13 @@ total_timesteps: 5_000_000
 
 Alternativas a comparar: DQN con features agregadas (baseline), PPO sin memoria, clasificador supervisado + umbral (baseline no-RL).
 
+> **Implementado** (`src/supervisor/policy.py`, `src/supervisor/train.py`):
+> - `SeatSetEncoder`: MLP compartido por silla `[64, 64]` + MLP global `[32]`, concatenados en orden de silla.
+> - `sb3-contrib` sólo trae LSTM: se usa `MultiInputLstmPolicy` con 128 unidades (en vez de GRU). Con `--algo ppo` se entrena la misma red sin memoria.
+> - `VecNormalize` normaliza observaciones y recompensa; sus estadísticas se guardan junto al modelo.
+> - `batch_size: 2048` y `n_epochs: 5` en vez de 256 y 10: con los valores originales la LSTM iba a ~140 pasos/s (5M ≈ 10 h). Ahora, con 8 mesas en un CPU de escritorio: RecurrentPPO ~310 pasos/s (5M ≈ 4.5 h), PPO ~1200 pasos/s (5M ≈ 70 min).
+> - Por defecto todos los tipos tienen la misma duración media de sesión (100 rondas) para que el agente no aprenda a reconocerlos por cuánto se quedan (sección 10).
+
 ---
 
 ## 7. Entrenamiento y reentrenamiento continuo (`configs/training.yaml`)
@@ -317,6 +332,8 @@ loop:
   5. Evaluar en un set de validación FIJO (mismas semillas).
   6. Si mejora → promover como nueva versión (checkpoint v_{t+1}); si no → descartar.
 ```
+
+> **Implementado** (`src/retraining/online_loop.py`, `scripts/online_retrain.py`). PPO aprende de datos de su propia política, así que el "buffer" no guarda transiciones viejas sino **escenarios** (`src/retraining/buffer.py`): el 70% de las mesas de fine-tuning recibe los camuflajes nuevos del ciclo y el 30% los de ciclos anteriores. Cada ciclo: el adversario evoluciona contra el campeón → fine-tuning → validación con semillas fijas en los niveles de disfraz 0.0/0.3/0.6/0.9 → se promueve si el F1 sube ≥ 0.01 con FP ≤ 5%. El historial queda en `history.json`.
 
 **Adversario evolutivo (arms race)** — `src/retraining/adversary.py`:
 - Los parámetros de camuflaje del contador disimulado se optimizan (algoritmo evolutivo / CMA-ES, o RL) para **maximizar su ganancia esperada − penalización por ser expulsado** contra el supervisor actual.
@@ -376,22 +393,23 @@ El tipo real de cada jugador se puede ocultar; el supervisor nunca lo ve. Por ah
 
 `[A]` / `[B]` = responsable (ver sección 11).
 
-- [ ] `[A+B]` Contrato de interfaces (`EventLog`, espacios de observación/acción) — sección 11.2.
+- [x] `[A+B]` Contrato de interfaces (`SeatEvent` en `src/env/events.py`, espacios de observación/acción) — sección 11.2.
 - [x] `[A]` Shoe, reglas y mano (`src/blackjack/`) + tests de pago y reglas.
 - [x] `[A]` Tabla de estrategia básica + desviaciones I18.
 - [x] `[A]` Jugadores: casual, contador, disimulado (con `disguise_level`).
 - [x] `[A]` Verificar por simulación que el contador tiene EV positivo y el casual negativo (`scripts/validate_players.py`).
 - [x] `[A]` Conseguir EV > 0 en el disimulado con `disguise_level` 0.6 y 0.9 (sección 5.3).
 - [x] `[A]` Mesa de 5 sillas con entrada/salida de jugadores.
-- [ ] `[B]` Extractor de features por silla.
+- [x] `[B]` Extractor de features por silla (`src/env/features.py`, predeterminado en el env).
 - [x] `[A]` `CasinoTableEnv` (Gymnasium) + `check_env`.
-- [ ] `[B]` Baselines (heurística y clasificador).
-- [ ] `[B]` Supervisor RecurrentPPO + logging en TensorBoard.
-- [x] `[A]` Curriculum de disfraz (`src/env/curriculum.py`).
-- [ ] `[B]` Bucle de reentrenamiento continuo + buffer.
-- [x] `[A]` Adversario evolutivo + liga (`src/retraining/adversary.py`, `scripts/run_adversary.py`; mientras no haya supervisor entrenado evoluciona contra la heurística).
-- [ ] `[B]` Métricas y script de evaluación.
-- [ ] `[A+B]` Experimentos finales, gráficas e informe.
+- [x] `[B]` Baselines: heurística (`src/supervisor/baselines.py`) y clasificador (`src/supervisor/classifier.py`, `scripts/train_classifier.py`).
+- [x] `[B]` Supervisor RecurrentPPO + logging en TensorBoard (`src/supervisor/train.py`, `scripts/train_supervisor.py`). **Falta correr el entrenamiento completo** (sección 12).
+- [x] `[A]` Curriculum de disfraz (`src/env/curriculum.py`; conectado al entrenamiento con `--curriculum`).
+- [x] `[B]` Bucle de reentrenamiento continuo + buffer (`src/retraining/online_loop.py`, `buffer.py`, `scripts/online_retrain.py`).
+- [x] `[A]` Adversario evolutivo + liga (`src/retraining/adversary.py`, `scripts/run_adversary.py`; evoluciona contra la heurística o contra un modelo con `--supervisor`).
+- [x] `[B]` Métricas y script de evaluación (`src/eval/`, `scripts/evaluate_baselines.py`).
+- [x] `[B]` Barrido de recompensa (`scripts/sweep_reward.py`).
+- [ ] `[A+B]` Correr los entrenamientos (sección 12), experimentos finales, gráficas e informe.
 
 ---
 
@@ -399,7 +417,9 @@ El tipo real de cada jugador se puede ocultar; el supervisor nunca lo ve. Por ah
 
 - **Recompensa desbalanceada**: si `expel_casual` es poco penalizado, el agente expulsa a todos. Monitorear siempre la tasa de FP.
 - **Pocas señales en pocas rondas**: con < 20 rondas casi no hay información; la red debe aprender a "esperar".
-- **Reward hacking**: verificar que el supervisor no explote artefactos del simulador (p.ej. la duración de sesión distinta por tipo). Usar la misma distribución de duración para todos en evaluación.
+- **Reward hacking**: verificar que el supervisor no explote artefactos del simulador (p.ej. la duración de sesión distinta por tipo). Usar la misma distribución de duración para todos en evaluación. *Resuelto:* entrenamiento, clasificador y evaluación usan por defecto 100 rondas para todos (`--unequal-sessions` para volver a la distribución por tipo).
+- **Jugar perfecto delata**: el casual se equivoca en el 5–20% de las jugadas y los contadores casi nunca (`basic_strategy_error_rate` 0.108 contra ≤ 0.009). Con eso el clasificador llega a AUC ≈ 1.0 con nivel 0.3, así que la estrategia sola ya identifica al contador. El adversario puede corregirlo (`deliberate_error_prob` llega hasta 1.0 en `BOUNDS`), pero sólo si evoluciona contra un supervisor que use esa señal: la heurística mira sólo `corr_bet_tc`. Por eso conviene correr `online_retrain.py` con el adversario activado.
+- **La ganancia del contador en la recompensa es aproximada**: `expected_counter_gain` usa −0.4% + 0.5% por TC y no descuenta las jugadas índice que el disimulado omite, así que lo sobreestima un poco.
 - **Sobreajuste al adversario**: la liga de adversarios antiguos y el set de validación fijo lo mitigan.
 - **Varianza alta del blackjack**: usar muchas mesas en paralelo y semillas fijas para comparar versiones.
 
@@ -486,3 +506,25 @@ class SeatEvent:
 - **B** tiene más trabajo de ML/experimentación (features, red, PPO, reentrenamiento, evaluación), que requiere muchas iteraciones de entrenamiento.
 - Ambos tocan RL: A con el diseño del POMDP y el adversario, B con el agente y su entrenamiento.
 - Gracias a los datos *mock*, B no depende de A hasta la semana 4.
+
+---
+
+## 12. Cómo entrenar (paso a paso)
+
+Todo el código está listo. Falta correr los entrenamientos, que tardan horas. Comandos desde la raíz del proyecto con la `.venv` de la sección 2 (`.venv\Scripts\python.exe` o con la venv activada). Las corridas quedan en `runs/<nombre>/` y se pueden seguir con `tensorboard --logdir runs`: `eval/recall_stealth`, `eval/fp_rate`, `eval/f1_counters`, `curriculum/stage`.
+
+| # | Paso | Comando | Tiempo aprox. |
+|---|---|---|---|
+| 1 | Baselines | `python scripts/train_classifier.py` y luego `python scripts/evaluate_baselines.py --classifier models/classifier_logistic.joblib models/classifier_gboost.joblib --csv runs/baselines.csv` | 5 + 20 min |
+| 2 | PPO sin memoria (rápido, valida la recompensa) | `python scripts/train_supervisor.py --run runs/ppo --algo ppo` | 70 min |
+| 3 | RecurrentPPO (el de la sección 6.5) | `python scripts/train_supervisor.py --run runs/rppo` | 4.5 h |
+| 4 | RecurrentPPO con curriculum | `python scripts/train_supervisor.py --run runs/rppo_curr --curriculum` | 4.5 h |
+| 5 | Comparar todo con las mismas semillas | `python scripts/evaluate_baselines.py --model runs/ppo runs/rppo runs/rppo_curr --csv runs/comparacion.csv` (repetir con `--disguise 0.6` y `0.9` para la robustez) | 20 min por nivel |
+| 6 | Curva de trade-off | `python scripts/sweep_reward.py --algo ppo --values -5 -10 -25 -50 --timesteps 2000000` | 1 h |
+| 7 | Arms race + reentrenamiento continuo | `python scripts/online_retrain.py --from runs/rppo_curr --out runs/online --cycles 5` | varias horas |
+| 8 | Ver al campeón jugando | `python scripts/render_table.py --model runs/online --disguise 0.6` | 1 min |
+
+- Cada corrida guarda `best/` (mejor F1 con FP ≤ 5%), `final/` y `last/`. Los scripts cargan `best/` por defecto (`--checkpoint final` para otro).
+- Si el agente expulsa demasiado (FP alto) o no expulsa nunca, ajustar `--expel-casual` y `--ent-coef` en `train_supervisor.py`. El barrido del paso 6 muestra el efecto.
+- Para probar que todo corre sin esperar horas: `python scripts/train_supervisor.py --run runs/prueba --algo ppo --timesteps 50000 --eval-freq 25000 --eval-episodes 2`.
+- `python -m pytest -m "not slow"` incluye pruebas de humo de entrenamiento, carga, curriculum, adversario con modelo entrenado, clasificador y bucle online (`tests/test_training.py`).

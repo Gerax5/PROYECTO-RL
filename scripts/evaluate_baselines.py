@@ -1,14 +1,19 @@
-"""Mide los baselines sin aprendizaje sobre episodios con semillas fijas.
+"""Compara los supervisores sobre episodios con semillas fijas.
 
-Es la vara contra la que se compara el supervisor RL: misma mesa, mismas semillas.
+Siempre mide "nunca expulsa" y la heurística; con `--classifier` y `--model` agrega el
+baseline supervisado y los supervisores entrenados. Misma mesa y mismas semillas
+para todos.
 
 Uso:
-    python scripts/evaluate_baselines.py --episodes 20 --rounds 600
+    python scripts/evaluate_baselines.py --episodes 20
+    python scripts/evaluate_baselines.py --classifier models/classifier_gboost.joblib
+    python scripts/evaluate_baselines.py --model runs/rppo_base runs/online --disguise 0.6
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -40,28 +45,59 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1000, help="primera semilla de evaluación")
     parser.add_argument("--disguise", type=float, default=None,
                         help="disguise_level del disimulado (por defecto el de TableConfig)")
+    parser.add_argument("--unequal-sessions", action="store_true",
+                        help="duración de sesión distinta por tipo (por defecto todas 100 rondas)")
+    parser.add_argument("--classifier", type=Path, nargs="*", default=[],
+                        help="modelos de scripts/train_classifier.py")
+    parser.add_argument("--classifier-threshold", type=float, nargs="+", default=[0.8, 0.9, 0.95])
+    parser.add_argument("--model", type=Path, nargs="*", default=[],
+                        help="corridas de scripts/train_supervisor.py u online_retrain.py")
+    parser.add_argument("--checkpoint", default="best", help="best | final | last")
+    parser.add_argument("--csv", type=Path, default=None, help="guardar los resultados en CSV")
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
     cfg = TableConfig()
     if args.disguise is not None:
         cfg = replace(cfg, stealth=StealthConfig.from_disguise(args.disguise))
+    if not args.unequal_sessions:
+        cfg = replace(cfg, session_mean_rounds={k: 100.0 for k in cfg.population_mix})
     seeds = list(range(args.seed, args.seed + args.episodes))
 
     policies = {"nunca expulsa": NeverExpel()}
     for threshold in (0.4, 0.5, 0.6, 0.7):
         policies[f"heurística corr>{threshold} n>30"] = HeuristicSupervisor(threshold, 30)
     policies["heurística spearman>0.5 n>30"] = HeuristicSupervisor(0.5, 30, "rank_corr_bet_tc")
+    if args.classifier:
+        from supervisor.classifier import ClassifierSupervisor
+
+        for path in args.classifier:
+            for t in args.classifier_threshold:
+                policies[f"{path.stem} p>{t}"] = ClassifierSupervisor.load(path, threshold=t)
+    if args.model:
+        from supervisor.train import load_supervisor
+
+        for run in args.model:
+            policies[f"RL {run.name} ({args.checkpoint})"] = load_supervisor(run, args.checkpoint)
 
     print(f"{args.episodes} episodios x {args.rounds} rondas, semillas {seeds[0]}..{seeds[-1]}\n")
-    print(f"{'política':32s} " + " ".join(h for _, h, _ in COLUMNS))
+    width = max(32, max(len(n) for n in policies))
+    print(f"{'política':{width}s} " + " ".join(h for _, h, _ in COLUMNS))
+    rows = []
     for name, policy in policies.items():
         m = evaluate(policy, seeds, cfg, rounds_per_episode=args.rounds)
         s = m.summary()
+        rows.append({"policy": name, **s})
         cells = " ".join(fmt.format(s[key]).rjust(len(h)) for key, h, fmt in COLUMNS)
-        print(f"{name:32s} {cells}", flush=True)
+        print(f"{name:{width}s} {cells}", flush=True)
 
     print(f"\njugadores vistos: {dict(m.seen)}")
+    if args.csv is not None:
+        args.csv.parent.mkdir(parents=True, exist_ok=True)
+        with open(args.csv, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
     return 0
 
 

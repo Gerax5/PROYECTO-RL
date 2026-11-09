@@ -35,6 +35,8 @@ def main() -> int:
     parser.add_argument("--min-rounds", type=int, default=30)
     parser.add_argument("--disguise", type=float, default=None,
                         help="disguise_level del disimulado (por defecto el de TableConfig)")
+    parser.add_argument("--model", type=Path, default=None,
+                        help="corrida entrenada; reemplaza a --policy")
     parser.add_argument("--out", type=Path, default=ROOT / "replays" / "mesa.html")
     parser.add_argument("--no-open", action="store_true", help="no abrir el navegador")
     args = parser.parse_args()
@@ -44,7 +46,12 @@ def main() -> int:
     if args.disguise is not None:
         cfg = replace(cfg, stealth=StealthConfig.from_disguise(args.disguise))
 
-    if args.policy == "heuristic":
+    if args.model is not None:
+        from supervisor.train import load_supervisor
+
+        policy = load_supervisor(args.model)
+        meta = {"policy": f"Supervisor RL ({args.model.name})", "threshold": args.threshold}
+    elif args.policy == "heuristic":
         policy = HeuristicSupervisor(args.threshold, args.min_rounds)
         meta = {"policy": f"Heurística corr_bet_tc > {args.threshold} tras {args.min_rounds} rondas",
                 "threshold": args.threshold}
