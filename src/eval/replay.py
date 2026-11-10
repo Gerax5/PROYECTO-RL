@@ -3,6 +3,10 @@
 Cada cuadro es un `step` del ambiente: primero las expulsiones que decidió el
 supervisor con la observación anterior y después la ronda jugada. El tipo real de
 cada jugador se guarda para mostrarlo, pero la política nunca lo recibe.
+
+Con un `explainer` (ver `xai.make_explainer`) cada silla trae además `xai`: la
+explicación de la decisión que el supervisor tomó en ese cuadro, calculada con la
+misma observación que recibió la política.
 """
 
 from __future__ import annotations
@@ -50,6 +54,7 @@ def record_episode(
     reward_config: RewardConfig | None = None,
     rounds: int = 600,
     meta: dict | None = None,
+    explainer=None,
 ) -> dict:
     """Juega un episodio y devuelve los cuadros listos para `write_html`."""
     env = CasinoTableEnv(table_config, reward_config, rounds)
@@ -69,6 +74,7 @@ def record_episode(
     frames = []
     done = False
     while not done:
+        explanations = explainer.explain(obs) if explainer is not None else None
         action = np.asarray(policy.act(obs))
         obs, reward, terminated, truncated, info = env.step(action)
         done = terminated or truncated
@@ -110,6 +116,11 @@ def record_episode(
             s["expel_order"] = bool(action[seat] == ACTION_EXPEL)
             if s["occupied"] and not s.get("left"):
                 s["features"] = _features(obs["seats"][seat])
+            # La explicación es del jugador que estaba sentado al decidir: si se fue y
+            # se sentó otro, sólo se muestra cuando lo expulsaron (sello en la silla).
+            if explanations is not None and explanations[seat] is not None \
+                    and (not s.get("sat") or s["expel_order"]):
+                s["xai"] = explanations[seat]
 
         totals["house_net"] += info["house_net"]
         totals["reward"] += reward
@@ -130,9 +141,12 @@ def record_episode(
             "seen": dict(totals["seen"]),
         })
 
+    meta = {"seed": seed, "rounds": rounds, "seats": n_seats,
+            "suspicion_feature": "corr_bet_tc", **(meta or {})}
+    if explainer is not None:
+        meta["xai"] = {"method": explainer.method, "score_label": explainer.score_label}
     return {
-        "meta": {"seed": seed, "rounds": rounds, "seats": n_seats,
-                 "suspicion_feature": "corr_bet_tc", **(meta or {})},
+        "meta": meta,
         "features": list(SEAT_FEATURES),
         "frames": frames,
     }

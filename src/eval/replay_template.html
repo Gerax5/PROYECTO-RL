@@ -156,6 +156,23 @@
   .log .r { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: 4px; }
   .log .ok { color: var(--ok); font-weight: 700; } .log .bad { color: var(--bad); font-weight: 700; }
   .muted { color: var(--muted); }
+
+  /* ------------------------------------------------------------ XAI */
+  .why { width: 100%; display: flex; flex-direction: column; gap: 1px; margin-top: 1px; }
+  .why div { display: flex; justify-content: space-between; gap: 4px; font-size: 10px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+  .why span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,.75); }
+  .up { color: #ff9b9b; } .down { color: #9ecbff; }
+  .xai { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .xai h3 { margin: 0 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
+  .xai .sum { font-size: 12px; margin-bottom: 4px; }
+  .arow { display: grid; grid-template-columns: 1fr 90px 52px; gap: 6px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .arow .n { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .arow .x { text-align: right; }
+  .abar { position: relative; height: 8px; background: var(--panel-2); border-radius: 2px; }
+  .abar::after { content: ""; position: absolute; left: 50%; top: -2px; width: 1px; height: 12px; background: var(--line); }
+  .abar i { position: absolute; top: 0; height: 100%; border-radius: 2px; }
+  .abar i.up { background: var(--bad); } .abar i.down { background: var(--casual); }
+  .arow.extra .n { font-style: italic; }
 </style>
 </head>
 <body>
@@ -211,7 +228,7 @@
         <span style="--c: var(--stealth)">Disimulado</span>
         <span style="--c: var(--ok)">Expulsión correcta</span>
         <span style="--c: var(--bad)">Falso positivo</span>
-        <span class="muted" style="--c: transparent">Barra: sospecha (corr. apuesta–TC); línea blanca: umbral</span>
+        <span class="muted" style="--c: transparent" id="legendBar">Barra: sospecha (corr. apuesta–TC); línea blanca: umbral</span>
       </div>
     </div>
   </section>
@@ -300,7 +317,65 @@
     if (bet >= 2) return "#c0262d";
     return "#2f6fb8";
   }
-  function meterHTML(feat) {
+  // ---------------------------------------------------- XAI
+  const XAI = META.xai || null;
+  const LABEL = {
+    occupied: "ocupada", rounds_seen: "rondas vistas", bet_norm: "apuesta actual",
+    corr_bet_tc: "corr. apuesta–TC", rank_corr_bet_tc: "Spearman apuesta–TC", bet_tc_slope: "pendiente apuesta–TC",
+    bet_spread: "rango de apuesta", corr_bet_prev_result: "apuesta ~ resultado previo",
+    index_play_rate: "jugadas índice", basic_strategy_error_rate: "errores de estrategia",
+    insurance_rate: "tasa de seguro", insurance_tc_mean: "TC al asegurar", sit_out_rate: "rondas sin apostar",
+    entry_tc: "TC al sentarse", net_win_units: "ganancia acumulada",
+  };
+  const ACTION_ES = ["nada", "vigilar", "expulsar"];
+  const lbl = n => LABEL[n] || n;
+  const topAttr = (attr, k) => Object.entries(attr).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, k);
+  if (XAI) {
+    $("legendBar").textContent = `Barra: ${XAI.score_label}${THR != null ? " (línea blanca: umbral)" : ""} · ` +
+      `▲ empuja a expulsar, ▼ en contra (${XAI.method})`;
+  }
+
+  function xaiMeterHTML(s) {
+    const x = s.xai, v = x.score;
+    const hot = THR != null ? v > THR : x.action === 2;
+    const color = hot ? "var(--bad)" : (x.action === 1 || v > 0.25) ? "var(--warn)" : "var(--casual)";
+    const thr = THR != null ? `<div class="thr" style="left:${THR * 100}%"></div>` : "";
+    const own = Object.fromEntries(Object.entries(x.attr).filter(([n]) => n !== "occupied"));
+    const why = topAttr(own, 3).filter(([, a]) => Math.abs(a) >= 0.005).map(([n, a]) =>
+      `<div><span title="${n}">${lbl(n)}</span><span class="${a > 0 ? "up" : "down"}">${a > 0 ? "▲" : "▼"}${Math.abs(a).toFixed(2)}</span></div>`).join("");
+    return `<div class="meter"><div class="bar"><div class="fill" style="left:0;width:${v * 100}%;background:${color}"></div>${thr}</div>
+      <div class="cap"><span>${XAI.score_label} ${v.toFixed(2)}</span><span>${s.features ? rondas(Math.round(s.features.rounds_seen)) : ""}</span></div></div>
+      <div class="why">${why}</div>`;
+  }
+
+  function xaiDetailHTML(x) {
+    const rows = Object.entries(x.attr).filter(([n]) => n !== "occupied");
+    const extra = [];
+    if (x.other_seats != null) extra.push(["otras sillas", x.other_seats]);
+    if (x.global != null) extra.push(["estado global (TC, zapato…)", x.global]);
+    const all = [...rows, ...extra];
+    const scale = Math.max(1e-6, ...all.map(([, a]) => Math.abs(a)));
+    const bar = a => {
+      const w = Math.abs(a) / scale * 50;
+      return `<div class="abar"><i class="${a > 0 ? "up" : "down"}" style="left:${a > 0 ? 50 : 50 - w}%;width:${w}%"></i></div>`;
+    };
+    const line = ([n, a], cls = "") => `<div class="arow ${cls}"><div class="n" title="${esc(n)}">${esc(lbl(n))}</div>${bar(a)}<div class="x ${a > 0 ? "up" : a < 0 ? "down" : ""}">${fmt(a, 3)}</div></div>`;
+    const sorted = rows.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    const total = all.reduce((t, [, a]) => t + a, 0);
+    let sum;
+    if (x.probs) {
+      sum = `Decisión: <b>${ACTION_ES[x.action]}</b> · P = ${x.probs.map((p, k) => `${ACTION_ES[k]} ${p.toFixed(2)}`).join(", ")}<br>
+        <span class="muted">log-odds de expulsar: referencia ${x.base.toFixed(2)} → ${x.target.toFixed(2)} (suma de aportes ${fmt(total, 2)}; el resto lo aporta la memoria)</span>`;
+    } else {
+      sum = `${XAI.score_label} = <b>${x.score.toFixed(2)}</b>${THR != null ? ` (umbral ${THR})` : ""}<br>
+        <span class="muted">referencia ${x.base.toFixed(2)} · cada aporte = cuánto baja P si esa feature toma valores de un jugador típico</span>`;
+    }
+    return `<div class="xai" style="grid-column:1/-1"><h3>Por qué decidió así (${esc(XAI.method)})</h3>
+      <div class="sum">${sum}</div>${sorted.map(r => line(r)).join("")}${extra.map(r => line(r, "extra")).join("")}</div>`;
+  }
+
+  function meterHTML(feat, s) {
+    if (s && s.xai && XAI) return xaiMeterHTML(s);
     if (!feat) return "";
     const v = feat[META.suspicion_feature] ?? 0;
     const pct = Math.max(0, Math.min(1, (v + 1) / 2)) * 100; // [-1, 1] -> [0, 100]
@@ -354,7 +429,7 @@
             ${s.bet > 0 ? `<div class="chip" style="background:${chipColor(s.bet)}">${s.bet}</div>` : ""}
             <div class="net ${netCls}">${s.bet > 0 ? fmt(s.net, 1) : "—"}<div class="muted" style="font-weight:400;font-size:10px">sesión ${fmt(s.session_net, 1)}</div></div>
           </div>
-          ${meterHTML(s.features)}`;
+          ${meterHTML(s.features, s)}`;
       }
       const ex = expelledHere[k];
       if (ex) {
@@ -387,14 +462,15 @@
     }
     const s = f.seats[selected];
     $("detailTitle").textContent = `Silla ${selected + 1} · lo que ve el supervisor`;
+    const why = s.xai && XAI ? xaiDetailHTML(s.xai) : "";
     if (!s.features) {
-      $("detail").innerHTML = `<div class="muted" style="grid-column:1/-1">${s.occupied ? "El jugador se fue en esta ronda." : "Silla vacía."}</div>`;
+      $("detail").innerHTML = `<div class="muted" style="grid-column:1/-1">${s.occupied ? "El jugador se fue en esta ronda." : "Silla vacía."}</div>` + why;
       return;
     }
     $("detail").innerHTML = R.features.map(n =>
       `<div class="n${n === META.suspicion_feature ? " key" : ""}" title="${n}">${n}</div><div class="x">${Number(s.features[n]).toFixed(2)}</div>`
     ).join("") + (s.actions && s.actions.length
-      ? `<div class="n" style="grid-column:1/-1;margin-top:6px">Jugadas de esta ronda: <span style="color:var(--text)">${esc(s.actions.join(", "))}</span>${s.index_play ? ' · <span style="color:var(--gold)">jugada índice</span>' : ""}</div>` : "");
+      ? `<div class="n" style="grid-column:1/-1;margin-top:6px">Jugadas de esta ronda: <span style="color:var(--text)">${esc(s.actions.join(", "))}</span>${s.index_play ? ' · <span style="color:var(--gold)">jugada índice</span>' : ""}</div>` : "") + why;
   }
 
   function logLine(f, e) {

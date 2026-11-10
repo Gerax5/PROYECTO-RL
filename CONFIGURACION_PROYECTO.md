@@ -387,6 +387,21 @@ Graficar todo por **ciclo de reentrenamiento** para mostrar que el supervisor me
 
 El tipo real de cada jugador se puede ocultar; el supervisor nunca lo ve. Por ahora graba al supervisor heurístico (`--policy heuristic|never`). Cualquier política con `reset()` y `act(obs)` sirve con `eval.replay.record_episode`. Con `mesa.html#r=120&s=3` se abre en la ronda 120 con la silla 3 seleccionada.
 
+### 8.2 Explicabilidad (XAI, `src/xai/`)
+
+Responde **por qué** el supervisor vigila o expulsa a un jugador. Cada explicador tiene `explain(obs)` y se llama con la misma observación que la política, antes de `act`; `xai.make_explainer(policy)` elige el adecuado.
+
+| Política | Método | Qué se explica | Referencia |
+|---|---|---|---|
+| RL (`--model`) | Gradientes integrados (`xai/policy.py`) | log-odds de expulsar de cada silla | observación normalizada nula (la mesa promedio de `VecNormalize`) |
+| Clasificador (`--classifier`) | Oclusión marginal (`xai/tabular.py`) + importancia por permutación (global) | P(contador) | muestra de jugadores reales del simulador |
+| Heurística | (no hace falta: la regla es `corr_bet_tc > umbral`) | — | — |
+
+- Con RecurrentPPO la memoria de la LSTM se deja fija en el estado del momento: se atribuye la observación actual y lo que aporta la memoria queda en la referencia. Se cumple la completitud: la suma de aportes (propia silla + otras sillas + global) ≈ objetivo − referencia (`tests/test_xai.py`).
+- **Local, en la mesa visual:** con `--model` o `--classifier`, `render_table.py` cambia la barra de sospecha por la P del modelo y muestra en cada silla las 3 features que más pesaron (▲ empuja a expulsar, ▼ en contra). Al hacer clic en una silla se ve el desglose completo. `--no-xai` lo desactiva.
+- **Global:** `python scripts/explain_supervisor.py --model runs/rppo` (o `--classifier models/classifier_gboost.joblib`) promedia las atribuciones de varios episodios por grupo (expulsión correcta, falso positivo, no expulsado por tipo) y guarda `runs/xai_<nombre>.json`.
+- Si las atribuciones de una política son casi nulas, su decisión no depende de las features (pasa con modelos poco entrenados, que expulsan casi al azar).
+
 ---
 
 ## 9. Checklist de implementación
@@ -522,7 +537,8 @@ Todo el código está listo. Falta correr los entrenamientos, que tardan horas. 
 | 5 | Comparar todo con las mismas semillas | `python scripts/evaluate_baselines.py --model runs/ppo runs/rppo runs/rppo_curr --csv runs/comparacion.csv` (repetir con `--disguise 0.6` y `0.9` para la robustez) | 20 min por nivel |
 | 6 | Curva de trade-off | `python scripts/sweep_reward.py --algo ppo --values -5 -10 -25 -50 --timesteps 2000000` | 1 h |
 | 7 | Arms race + reentrenamiento continuo | `python scripts/online_retrain.py --from runs/rppo_curr --out runs/online --cycles 5` | varias horas |
-| 8 | Ver al campeón jugando | `python scripts/render_table.py --model runs/online --disguise 0.6` | 1 min |
+| 8 | Ver al campeón jugando (con XAI) | `python scripts/render_table.py --model runs/online --disguise 0.6` | 1 min |
+| 9 | Explicación global (XAI) | `python scripts/explain_supervisor.py --model runs/online` y `--classifier models/classifier_gboost.joblib` | 5 min |
 
 - Cada corrida guarda `best/` (mejor F1 con FP ≤ 5%), `final/` y `last/`. Los scripts cargan `best/` por defecto (`--checkpoint final` para otro).
 - Si el agente expulsa demasiado (FP alto) o no expulsa nunca, ajustar `--expel-casual` y `--ent-coef` en `train_supervisor.py`. El barrido del paso 6 muestra el efecto.
