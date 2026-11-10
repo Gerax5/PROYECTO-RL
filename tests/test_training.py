@@ -63,6 +63,22 @@ def test_trained_supervisor_works_with_the_adversary(run):
     assert 0.0 <= rate <= 1.0
 
 
+def test_initial_policy_rarely_expels(tmp_path):
+    import torch
+
+    from supervisor.train import make_model, make_vec_env
+
+    cfg = TrainConfig(algo="ppo", initial_action_logit=-5.0, **TINY)
+    venv = make_vec_env([TableConfig()], cfg.reward, 40, 0, "dummy")
+    model = make_model(cfg, venv)
+    obs = venv.reset()
+    obs_t, _ = model.policy.obs_to_tensor(obs)
+    with torch.no_grad():
+        probs = torch.stack([d.probs for d in model.policy.get_distribution(obs_t).distribution])
+    assert probs[..., 2].max() < 0.02 and probs[..., 0].min() > 0.95
+    venv.close()
+
+
 def test_curriculum_run(tmp_path):
     cfg = TrainConfig(algo="ppo", curriculum=True, **TINY)
     run = train(cfg, tmp_path / "curr")
