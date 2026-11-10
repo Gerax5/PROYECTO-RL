@@ -1,0 +1,410 @@
+{
+  "name": "classifier_gboost",
+  "method": "Oclusi\u00f3n marginal sobre P(contador)",
+  "seeds": [
+    50000,
+    50001,
+    50002,
+    50003,
+    50004
+  ],
+  "groups": {
+    "expulsion_correcta": {
+      "n": 49,
+      "features": [
+        {
+          "feature": "basic_strategy_error_rate",
+          "mean": 0.325795918367347,
+          "mean_abs": 0.325795918367347
+        },
+        {
+          "feature": "bet_spread",
+          "mean": 0.10486326530612244,
+          "mean_abs": 0.10521020408163266
+        },
+        {
+          "feature": "corr_bet_prev_result",
+          "mean": 0.07334489795918367,
+          "mean_abs": 0.0733530612244898
+        },
+        {
+          "feature": "index_play_rate",
+          "mean": 0.011553061224489795,
+          "mean_abs": 0.011577551020408161
+        },
+        {
+          "feature": "bet_tc_slope",
+          "mean": 0.00386938775510204,
+          "mean_abs": 0.00386938775510204
+        },
+        {
+          "feature": "corr_bet_tc",
+          "mean": 0.001228571428571429,
+          "mean_abs": 0.0012897959183673477
+        },
+        {
+          "feature": "entry_tc",
+          "mean": 0.0012653061224489797,
+          "mean_abs": 0.0012857142857142856
+        },
+        {
+          "feature": "rounds_seen",
+          "mean": 0.0008591836734693879,
+          "mean_abs": 0.0008591836734693879
+        },
+        {
+          "feature": "rank_corr_bet_tc",
+          "mean": 6.938775510204078e-05,
+          "mean_abs": 0.00023265306122448974
+        },
+        {
+          "feature": "bet_norm",
+          "mean": 0.0001469387755102041,
+          "mean_abs": 0.00015510204081632654
+        },
+        {
+          "feature": "net_win_units",
+          "mean": 3.673469387755102e-05,
+          "mean_abs": 3.673469387755102e-05
+        },
+        {
+          "feature": "occupied",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "insurance_rate",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "insurance_tc_mean",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "sit_out_rate",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        }
+      ]
+    },
+    "no_expulsado_casual": {
+      "n": 1169,
+      "features": [
+        {
+          "feature": "bet_spread",
+          "mean": -0.050731736526946174,
+          "mean_abs": 0.08561573994867414
+        },
+        {
+          "feature": "corr_bet_prev_result",
+          "mean": -0.03036090675791268,
+          "mean_abs": 0.0662223267750216
+        },
+        {
+          "feature": "basic_strategy_error_rate",
+          "mean": -0.00659255774165953,
+          "mean_abs": 0.06586852010265237
+        },
+        {
+          "feature": "bet_tc_slope",
+          "mean": 0.010464499572284012,
+          "mean_abs": 0.013157912745936692
+        },
+        {
+          "feature": "rounds_seen",
+          "mean": -0.01144516680923866,
+          "mean_abs": 0.01240325064157398
+        },
+        {
+          "feature": "corr_bet_tc",
+          "mean": 0.0024319076133447314,
+          "mean_abs": 0.006533704020530378
+        },
+        {
+          "feature": "index_play_rate",
+          "mean": -0.005435414884516688,
+          "mean_abs": 0.006070487596236105
+        },
+        {
+          "feature": "entry_tc",
+          "mean": -0.00024011976047904205,
+          "mean_abs": 0.004488366124893079
+        },
+        {
+          "feature": "net_win_units",
+          "mean": 0.0028968349016253196,
+          "mean_abs": 0.004017621899059028
+        },
+        {
+          "feature": "rank_corr_bet_tc",
+          "mean": 0.0019532078699743306,
+          "mean_abs": 0.0034491873396065263
+        },
+        {
+          "feature": "bet_norm",
+          "mean": 0.00021958939264328503,
+          "mean_abs": 0.0005390076988879384
+        },
+        {
+          "feature": "insurance_tc_mean",
+          "mean": -5.731394354148845e-06,
+          "mean_abs": 7.442258340461933e-06
+        },
+        {
+          "feature": "insurance_rate",
+          "mean": 3.5072711719418303e-06,
+          "mean_abs": 3.849443969204448e-06
+        },
+        {
+          "feature": "occupied",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "sit_out_rate",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        }
+      ]
+    },
+    "no_expulsado_counter": {
+      "n": 75,
+      "features": [
+        {
+          "feature": "basic_strategy_error_rate",
+          "mean": 0.33380399999999993,
+          "mean_abs": 0.3580973333333333
+        },
+        {
+          "feature": "bet_spread",
+          "mean": 0.18316,
+          "mean_abs": 0.18507466666666667
+        },
+        {
+          "feature": "corr_bet_prev_result",
+          "mean": 0.15456,
+          "mean_abs": 0.15456
+        },
+        {
+          "feature": "bet_tc_slope",
+          "mean": 0.06536000000000002,
+          "mean_abs": 0.06541866666666668
+        },
+        {
+          "feature": "rounds_seen",
+          "mean": -0.012042666666666665,
+          "mean_abs": 0.026381333333333333
+        },
+        {
+          "feature": "corr_bet_tc",
+          "mean": 0.022958666666666662,
+          "mean_abs": 0.023148
+        },
+        {
+          "feature": "entry_tc",
+          "mean": 0.0038453333333333325,
+          "mean_abs": 0.018005333333333325
+        },
+        {
+          "feature": "net_win_units",
+          "mean": 0.01134133333333333,
+          "mean_abs": 0.017357333333333325
+        },
+        {
+          "feature": "rank_corr_bet_tc",
+          "mean": 0.012011999999999998,
+          "mean_abs": 0.012059999999999998
+        },
+        {
+          "feature": "index_play_rate",
+          "mean": -0.0009306666666666669,
+          "mean_abs": 0.009167999999999999
+        },
+        {
+          "feature": "bet_norm",
+          "mean": 0.0012986666666666667,
+          "mean_abs": 0.001504
+        },
+        {
+          "feature": "insurance_tc_mean",
+          "mean": -6.666666666666667e-06,
+          "mean_abs": 6.666666666666667e-06
+        },
+        {
+          "feature": "occupied",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "insurance_rate",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "sit_out_rate",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        }
+      ]
+    },
+    "no_expulsado_stealth": {
+      "n": 97,
+      "features": [
+        {
+          "feature": "basic_strategy_error_rate",
+          "mean": 0.3340948453608246,
+          "mean_abs": 0.34385360824742267
+        },
+        {
+          "feature": "bet_spread",
+          "mean": 0.22481443298969064,
+          "mean_abs": 0.23626391752577316
+        },
+        {
+          "feature": "corr_bet_prev_result",
+          "mean": 0.1587938144329897,
+          "mean_abs": 0.16555463917525778
+        },
+        {
+          "feature": "bet_tc_slope",
+          "mean": 0.07712371134020621,
+          "mean_abs": 0.07880206185567012
+        },
+        {
+          "feature": "corr_bet_tc",
+          "mean": 0.04111649484536083,
+          "mean_abs": 0.04175360824742268
+        },
+        {
+          "feature": "rounds_seen",
+          "mean": -0.009026804123711336,
+          "mean_abs": 0.04154432989690721
+        },
+        {
+          "feature": "entry_tc",
+          "mean": 0.00734845360824742,
+          "mean_abs": 0.021820618556701036
+        },
+        {
+          "feature": "net_win_units",
+          "mean": 0.015085567010309277,
+          "mean_abs": 0.01698865979381443
+        },
+        {
+          "feature": "rank_corr_bet_tc",
+          "mean": 0.014831958762886597,
+          "mean_abs": 0.016386597938144325
+        },
+        {
+          "feature": "index_play_rate",
+          "mean": -0.006170103092783505,
+          "mean_abs": 0.009751546391752573
+        },
+        {
+          "feature": "bet_norm",
+          "mean": 0.0017381443298969076,
+          "mean_abs": 0.0018597938144329898
+        },
+        {
+          "feature": "insurance_tc_mean",
+          "mean": -6.185567010309278e-06,
+          "mean_abs": 6.185567010309278e-06
+        },
+        {
+          "feature": "occupied",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "insurance_rate",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        },
+        {
+          "feature": "sit_out_rate",
+          "mean": 0.0,
+          "mean_abs": 0.0
+        }
+      ]
+    }
+  },
+  "permutation_importance": [
+    {
+      "feature": "basic_strategy_error_rate",
+      "auc_drop": 0.0634137402259192,
+      "std": 0.0023342997253012416
+    },
+    {
+      "feature": "bet_spread",
+      "auc_drop": 0.0242799071999365,
+      "std": 0.0022359519425169698
+    },
+    {
+      "feature": "corr_bet_prev_result",
+      "auc_drop": 0.01736729392635473,
+      "std": 0.0015298789217040496
+    },
+    {
+      "feature": "corr_bet_tc",
+      "auc_drop": 0.0007268677334707707,
+      "std": 0.00019840505958908532
+    },
+    {
+      "feature": "rounds_seen",
+      "auc_drop": 0.00035104069586822106,
+      "std": 6.449273813998383e-05
+    },
+    {
+      "feature": "index_play_rate",
+      "auc_drop": 0.00034872730397303984,
+      "std": 6.537662836968856e-05
+    },
+    {
+      "feature": "bet_tc_slope",
+      "auc_drop": 0.0002998816865287468,
+      "std": 8.609972018141554e-05
+    },
+    {
+      "feature": "rank_corr_bet_tc",
+      "auc_drop": 0.00014686733688930033,
+      "std": 3.888251580023774e-05
+    },
+    {
+      "feature": "bet_norm",
+      "auc_drop": 3.509745989564994e-05,
+      "std": 1.03392556967697e-05
+    },
+    {
+      "feature": "net_win_units",
+      "auc_drop": 4.626783790095956e-07,
+      "std": 1.662977796869794e-05
+    },
+    {
+      "feature": "occupied",
+      "auc_drop": 0.0,
+      "std": 0.0
+    },
+    {
+      "feature": "insurance_rate",
+      "auc_drop": 0.0,
+      "std": 0.0
+    },
+    {
+      "feature": "sit_out_rate",
+      "auc_drop": 0.0,
+      "std": 0.0
+    },
+    {
+      "feature": "insurance_tc_mean",
+      "auc_drop": -1.9829073389932005e-07,
+      "std": 3.0289409920976636e-07
+    },
+    {
+      "feature": "entry_tc",
+      "auc_drop": -9.451858314735161e-06,
+      "std": 2.3774775087317892e-05
+    }
+  ]
+}

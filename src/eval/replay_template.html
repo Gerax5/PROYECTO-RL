@@ -165,7 +165,7 @@
   .xai { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
   .xai h3 { margin: 0 0 2px; font-size: 12px; color: var(--muted); font-weight: 600; }
   .xai .sum { font-size: 12px; margin-bottom: 4px; }
-  .arow { display: grid; grid-template-columns: 1fr 90px 52px; gap: 6px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .arow { display: grid; grid-template-columns: 1fr 70px 52px; gap: 6px; align-items: center; font-size: 12px; font-variant-numeric: tabular-nums; }
   .arow .n { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .arow .x { text-align: right; }
   .abar { position: relative; height: 8px; background: var(--panel-2); border-radius: 2px; }
@@ -348,7 +348,7 @@
       <div class="why">${why}</div>`;
   }
 
-  function xaiDetailHTML(x) {
+  function xaiDetailHTML(x, seen) {
     const rows = Object.entries(x.attr).filter(([n]) => n !== "occupied");
     const extra = [];
     if (x.other_seats != null) extra.push(["otras sillas", x.other_seats]);
@@ -359,7 +359,8 @@
       const w = Math.abs(a) / scale * 50;
       return `<div class="abar"><i class="${a > 0 ? "up" : "down"}" style="left:${a > 0 ? 50 : 50 - w}%;width:${w}%"></i></div>`;
     };
-    const line = ([n, a], cls = "") => `<div class="arow ${cls}"><div class="n" title="${esc(n)}">${esc(lbl(n))}</div>${bar(a)}<div class="x ${a > 0 ? "up" : a < 0 ? "down" : ""}">${fmt(a, 3)}</div></div>`;
+    const val = n => seen && n in seen ? ` <span style="color:var(--text)">= ${Number(seen[n]).toFixed(2)}</span>` : "";
+    const line = ([n, a], cls = "") => `<div class="arow ${cls}"><div class="n" title="${esc(n)}">${esc(lbl(n))}${val(n)}</div>${bar(a)}<div class="x ${a > 0 ? "up" : a < 0 ? "down" : ""}">${fmt(a, 3)}</div></div>`;
     const sorted = rows.sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
     const total = all.reduce((t, [, a]) => t + a, 0);
     let sum;
@@ -371,6 +372,7 @@
         <span class="muted">referencia ${x.base.toFixed(2)} · cada aporte = cuánto baja P si esa feature toma valores de un jugador típico</span>`;
     }
     return `<div class="xai" style="grid-column:1/-1"><h3>Por qué decidió así (${esc(XAI.method)})</h3>
+      <div class="muted" style="font-size:11px">Cada fila: variable = valor que vio el modelo · barra roja ▲ empuja a expulsar, azul ▼ en contra</div>
       <div class="sum">${sum}</div>${sorted.map(r => line(r)).join("")}${extra.map(r => line(r, "extra")).join("")}</div>`;
   }
 
@@ -460,9 +462,19 @@
       $("detail").innerHTML = `<div class="muted" style="grid-column:1/-1">Haz clic en una silla para ver lo que observa el supervisor de ese jugador.</div>`;
       return;
     }
-    const s = f.seats[selected];
-    $("detailTitle").textContent = `Silla ${selected + 1} · lo que ve el supervisor`;
-    const why = s.xai && XAI ? xaiDetailHTML(s.xai) : "";
+    let s = f.seats[selected];
+    // La decisión de este cuadro se tomó con lo observado al cierre del cuadro anterior.
+    const prev = i > 0 ? F[i - 1].seats[selected] : null;
+    const expelled = f.log.find(e => e.kind === "expelled" && e.seat === selected);
+    if (expelled && prev && prev.features) {
+      // Si tras la expulsión se sentó otro, se muestra al expulsado (el de la decisión).
+      $("detailTitle").textContent = `Silla ${selected + 1} · jugador expulsado #${prev.player_id}`;
+      s = { ...prev, xai: s.xai, actions: null };
+    } else {
+      $("detailTitle").textContent = `Silla ${selected + 1} · lo que ve el supervisor`;
+    }
+    const seen = prev && prev.features && (!f.seats[selected].sat || expelled) ? prev.features : null;
+    const why = s.xai && XAI ? xaiDetailHTML(s.xai, seen) : "";
     if (!s.features) {
       $("detail").innerHTML = `<div class="muted" style="grid-column:1/-1">${s.occupied ? "El jugador se fue en esta ronda." : "Silla vacía."}</div>` + why;
       return;
