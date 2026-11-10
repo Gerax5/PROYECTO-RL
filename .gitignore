@@ -22,7 +22,7 @@ htmlcov/
 .ipynb_checkpoints/
 
 # Entrenamiento: logs (TensorBoard, wandb, Hydra) y checkpoints
-runs/
+# runs/
 wandb/
 outputs/
 multirun/
@@ -40,6 +40,6 @@ Desktop.ini
 replays/
 
 # Clasificadores entrenados (scripts/train_classifier.py)
-models/
+# models/
 
 .claude/

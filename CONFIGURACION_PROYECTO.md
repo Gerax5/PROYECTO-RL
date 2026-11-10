@@ -409,7 +409,10 @@ El tipo real de cada jugador se puede ocultar; el supervisor nunca lo ve. Por ah
 - [x] `[A]` Adversario evolutivo + liga (`src/retraining/adversary.py`, `scripts/run_adversary.py`; evoluciona contra la heurística o contra un modelo con `--supervisor`).
 - [x] `[B]` Métricas y script de evaluación (`src/eval/`, `scripts/evaluate_baselines.py`).
 - [x] `[B]` Barrido de recompensa (`scripts/sweep_reward.py`).
-- [ ] `[A+B]` Correr los entrenamientos (sección 12), experimentos finales, gráficas e informe.
+- [x] `[B]` Entrenamientos base: baselines, PPO y RecurrentPPO con curriculum (resultados en la sección 13).
+- [x] `[B]` Gráficas de entrenamiento (`scripts/plot_training.py`).
+- [ ] `[A]` Ajustar umbrales del curriculum (no avanzó de la etapa 0, ver sección 13) y reentrenar con curriculum.
+- [ ] `[A+B]` Reentrenamiento online con adversario, robustez por nivel de disfraz, ablación sin `basic_strategy_error_rate`, informe.
 
 ---
 
@@ -521,10 +524,37 @@ Todo el código está listo. Falta correr los entrenamientos, que tardan horas. 
 | 4 | RecurrentPPO con curriculum | `python scripts/train_supervisor.py --run runs/rppo_curr --curriculum` | 4.5 h |
 | 5 | Comparar todo con las mismas semillas | `python scripts/evaluate_baselines.py --model runs/ppo runs/rppo runs/rppo_curr --csv runs/comparacion.csv` (repetir con `--disguise 0.6` y `0.9` para la robustez) | 20 min por nivel |
 | 6 | Curva de trade-off | `python scripts/sweep_reward.py --algo ppo --values -5 -10 -25 -50 --timesteps 2000000` | 1 h |
-| 7 | Arms race + reentrenamiento continuo | `python scripts/online_retrain.py --from runs/rppo_curr --out runs/online --cycles 5` | varias horas |
+| 7 | Arms race + reentrenamiento continuo | `python scripts/online_retrain.py --from runs/ppo --out runs/online --cycles 5` (partir del mejor modelo; hoy es `runs/ppo`, ver sección 13) | varias horas |
 | 8 | Ver al campeón jugando | `python scripts/render_table.py --model runs/online --disguise 0.6` | 1 min |
 
+- **Verificación** (PPO, 1M de pasos, `ent_coef=0.01` y sin sesgo inicial, 5 episodios de evaluación): a los 200k expulsaba de más (FP 67%), a los 600k casi nada (FP 1.7%, recall 0–6%) y al 1M llegó a recall 43% (contadores) / 44% (disimulados) con FP 1.7% y R/100 +2.1. Aprende, pero pasa por el óptimo local de "no expulsar nunca". Se probó arrancar con la expulsión poco probable (`initial_action_logit=-5`, `ent_coef=0.001`) y fue peor: no expulsó a nadie en 1M de pasos. Quedan los valores originales; el sesgo sigue disponible en `TrainConfig`.
 - Cada corrida guarda `best/` (mejor F1 con FP ≤ 5%), `final/` y `last/`. Los scripts cargan `best/` por defecto (`--checkpoint final` para otro).
 - Si el agente expulsa demasiado (FP alto) o no expulsa nunca, ajustar `--expel-casual` y `--ent-coef` en `train_supervisor.py`. El barrido del paso 6 muestra el efecto.
 - Para probar que todo corre sin esperar horas: `python scripts/train_supervisor.py --run runs/prueba --algo ppo --timesteps 50000 --eval-freq 25000 --eval-episodes 2`.
 - `python -m pytest -m "not slow"` incluye pruebas de humo de entrenamiento, carga, curriculum, adversario con modelo entrenado, clasificador y bucle online (`tests/test_training.py`).
+- Gráficas de entrenamiento: `python scripts/plot_training.py runs/ppo runs/rppo_curr --out runs/training_curves.png` (F1, recall por tipo, FP, rondas a detección y recompensa contra pasos, una línea por corrida).
+
+---
+
+## 13. Resultados y estado actual
+
+Corridos: pasos 1, 2 y 4 de la sección 12 (5M de pasos cada entrenamiento, 8 mesas, CPU). Evaluación con las semillas 1000–1019 (20 episodios), sesiones de 100 rondas para todos y nivel de disfraz por defecto.
+
+| Supervisor | Recall contadores | Recall disimulados | FP | F1 | Rondas a detección | R/100 |
+|---|---|---|---|---|---|---|
+| Heurística corr > 0.5 | 65% | 66% | 2.7% | 0.76 | – | +15.6 |
+| Spearman > 0.5 | 63% | 61% | 0.9% | 0.75 | – | +16.7 |
+| Logística p > 0.95 | 65% | 71% | 1.1% | 0.80 | – | +18.0 |
+| Gradient boosting p > 0.9 | 71% | 78% | 0.7% | 0.85 | 31 | +20.5 |
+| **PPO `final`** | **80.5%** | **80.4%** | 2.7% | **0.862** | **20** | **+22.9** |
+| PPO `best` (3.9M) | 77% | 76% | 3.9% | 0.82 | – | +20.2 |
+| RecurrentPPO + curriculum `final` | 79% | 71.5% | 1.7% | 0.841 | 24 | +16.8 |
+| RecurrentPPO + curriculum `best` | 72% | 76% | 3.9% | 0.811 | 25 | +13.5 |
+
+- **El mejor hoy es PPO `final`**: supera a todos los baselines en recall, F1, rapidez y recompensa, a cambio de más FP que el clasificador (2.7% contra 0.7%, dentro del límite de 5%).
+- Las curvas (`runs/training_curves.png`) muestran el mismo patrón en ambos: expulsa de más, pasa por "no expulsar nunca" y se recupera hacia el millón de pasos. RecurrentPPO sale antes de ese bache, pero después rinde menos que PPO.
+- `best/` se elige con sólo 10 episodios de validación y es ruidoso: en ambas corridas `final` fue mejor que `best`. Conviene subir `--eval-episodes` o usar `final`.
+- **El curriculum no avanzó nunca de la etapa 0**: `src/env/curriculum.py` exige 90% de recall de disimulados (con FP ≤ 5%) para pasar a la etapa 1 y el modelo no superó ~82%. Esa corrida es en la práctica RecurrentPPO sin disfraz. Hay que bajar los umbrales (p. ej. 0.75 / 0.70 / 0.65) y repetir, mejor con `--algo ppo` (70 min).
+- Los checkpoints están en `runs/` y los clasificadores en `models/`; ambas carpetas están en `.gitignore`. Para compartirlos sin los logs de TensorBoard: `git add -f runs/ppo/final runs/ppo/history.json runs/ppo/config.json runs/baselines.csv runs/training_curves.png models/` (unos 3 MB).
+
+**Siguientes pasos (en orden):** 1) ajustar umbrales del curriculum y reentrenar; 2) `online_retrain.py --from runs/ppo` con adversario; 3) robustez con `--disguise 0.6` y `0.9`; 4) ablación sin `basic_strategy_error_rate`; 5) informe.

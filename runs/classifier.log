@@ -1,0 +1,3 @@
+﻿30,463 muestras de entrenamiento (33% contadores), 7,627 de prueba
+logistic  AUC de prueba 0.995 -> C:\Users\fagui\OneDrive\Escritorio\Francis\PROYECTO-RL\models\classifier_logistic.joblib
+gboost    AUC de prueba 1.000 -> C:\Users\fagui\OneDrive\Escritorio\Francis\PROYECTO-RL\models\classifier_gboost.joblib

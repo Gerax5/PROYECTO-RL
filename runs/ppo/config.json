@@ -1,0 +1,44 @@
+{
+  "algo": "ppo",
+  "total_timesteps": 5000000,
+  "n_envs": 8,
+  "vec_env": "subproc",
+  "rounds_per_episode": 600,
+  "seed": 0,
+  "learning_rate": 0.0003,
+  "n_steps": 2048,
+  "batch_size": 2048,
+  "n_epochs": 5,
+  "gamma": 0.995,
+  "gae_lambda": 0.95,
+  "clip_range": 0.2,
+  "ent_coef": 0.01,
+  "initial_action_logit": null,
+  "seat_encoder": [
+    64,
+    64
+  ],
+  "global_encoder": [
+    32
+  ],
+  "lstm_hidden": 128,
+  "head": [
+    64
+  ],
+  "disguise": null,
+  "equal_sessions": true,
+  "session_mean": 100.0,
+  "curriculum": false,
+  "eval_freq": 100000,
+  "eval_episodes": 10,
+  "eval_seed": 10000,
+  "max_fp_rate": 0.05,
+  "reward": {
+    "expel_counter": 10.0,
+    "expel_stealth": 15.0,
+    "expel_casual": -25.0,
+    "counter_edge_per_round": -1.0,
+    "watch_cost": -0.05,
+    "early_detection_k": 20.0
+  }
+}

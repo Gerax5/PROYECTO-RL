@@ -56,6 +56,10 @@ class TrainConfig:
     gae_lambda: float = 0.95
     clip_range: float = 0.2
     ent_coef: float = 0.01
+    # Logit inicial de vigilar/expulsar frente a "nada" (0); None = inicialización de SB3.
+    # Probado: -5 con ent_coef 0.001 no expulsó nunca en 1M de pasos (explora muy poco);
+    # sin sesgo y con 0.01 llegó a recall 43% con FP 1.7%.
+    initial_action_logit: float | None = None
     # Red
     seat_encoder: tuple[int, ...] = (64, 64)
     global_encoder: tuple[int, ...] = (32,)
@@ -119,7 +123,7 @@ def make_model(cfg: TrainConfig, venv, tensorboard_log: str | None = None) -> Ba
     }
     if cfg.algo == "recurrent_ppo":
         policy_kwargs["lstm_hidden_size"] = cfg.lstm_hidden
-    return algo_cls(
+    model = algo_cls(
         policy,
         venv,
         learning_rate=cfg.learning_rate,
@@ -136,6 +140,18 @@ def make_model(cfg: TrainConfig, venv, tensorboard_log: str | None = None) -> Ba
         device="cpu",
         verbose=1,
     )
+    if cfg.initial_action_logit is not None:
+        bias_action_logits(model, cfg.initial_action_logit)
+    return model
+
+
+def bias_action_logits(model: BaseAlgorithm, logit: float) -> None:
+    """Pone en `logit` el sesgo de vigilar y expulsar de cada silla (MultiDiscrete([3]*n))."""
+    # SB3 ya inicializa los pesos de action_net con ganancia 0.01: al principio manda el sesgo.
+    with torch.no_grad():
+        bias = model.policy.action_net.bias.view(-1, 3)
+        bias[:, 0] = 0.0
+        bias[:, 1:] = logit
 
 
 # ---------------------------------------------------------------- política entrenada
